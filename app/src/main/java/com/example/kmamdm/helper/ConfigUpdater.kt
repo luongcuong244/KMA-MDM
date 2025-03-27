@@ -7,9 +7,11 @@ import com.example.kmamdm.model.Application
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
 import com.example.kmamdm.utils.Const
+import com.example.kmamdm.utils.InstallUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -21,8 +23,8 @@ class ConfigUpdater {
         fun onConfigUpdateNetworkError(errorText: String?)
         fun onConfigLoaded()
         fun onPoliciesUpdated() 
-//        fun onFileDownloading(remoteFile: RemoteFile?)
-//        fun onDownloadProgress(progress: Int, total: Long, current: Long)
+        // fun onFileDownloading(remoteFile: RemoteFile?)
+        fun onDownloadProgress(progress: Int, total: Long, current: Long)
 //        fun onFileDownloadError(remoteFile: RemoteFile?)
 //        fun onFileInstallError(remoteFile: RemoteFile?)
         fun onAppUpdateStart()
@@ -77,7 +79,9 @@ class ConfigUpdater {
                     if (response.isSuccessful && response.body() != null) {
                         // save config to share pref
                         SettingsHelper.getInstance(context).updateConfig(response.body()!!.data)
-                        uiNotifier?.onConfigUpdateComplete()
+                        CoroutineScope(Dispatchers.Main).launch {
+                            checkAndInstallApplications()
+                        }
                     }
                 }
 
@@ -86,6 +90,41 @@ class ConfigUpdater {
                     uiNotifier?.onConfigUpdateServerError(t.message)
                 }
             })
+        }
+    }
+
+    suspend fun checkAndInstallApplications() = withContext(Dispatchers.IO) {
+//        val applications = SettingsHelper.getInstance(context!!).getConfig()?.applications
+//        for (application in applications!!) {
+//            if (application.url != null) {
+//                uiNotifier?.onAppDownloading(application)
+//                val downloadedFile = InstallUtils.downloadFile(context!!, application.url, object : InstallUtils.DownloadProgress {
+//                    override fun onDownloadProgress(progress: Int, total: Long, current: Long) {
+//                        uiNotifier?.onDownloadProgress(progress, total, current)
+//                    }
+//                })
+//                withContext(Dispatchers.Main) {
+//                    Log.d("DownloadStatus", "Downloaded file: ${downloadedFile?.path}")
+//                }
+//                if (downloadedFile != null) {
+//                    uiNotifier?.onAppInstalling(application)
+//                    InstallUtils.requestInstallApplication(context!!, downloadedFile, object : InstallUtils.InstallErrorHandler {
+//                        override fun onInstallError(msg: String?) {
+//                            if (downloadedFile.exists()) {
+//                                downloadedFile.delete()
+//                            }
+//                            if (uiNotifier != null) {
+//                                uiNotifier!!.onAppInstallError(application.pkg)
+//                            }
+//                        }
+//                    })
+//                } else {
+//                    uiNotifier?.onAppDownloadError(application)
+//                }
+//            }
+//        }
+        withContext(Dispatchers.Main) {
+            uiNotifier?.onConfigUpdateComplete()
         }
     }
 }

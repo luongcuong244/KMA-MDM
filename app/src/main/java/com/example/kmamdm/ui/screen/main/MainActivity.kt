@@ -2,6 +2,8 @@ package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
 import android.graphics.Point
+import android.os.Handler
+import android.util.Log
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
@@ -22,6 +24,9 @@ import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -155,6 +160,12 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     override fun onPoliciesUpdated() {
+    }
+
+    override fun onDownloadProgress(progress: Int, total: Long, current: Long) {
+        CoroutineScope(Dispatchers.Main).launch {
+            Log.d("InstallApplication", "Download progress: $current/$total")
+        }
     }
 
 //    override fun onFileDownloading(remoteFile: RemoteFile?) {
