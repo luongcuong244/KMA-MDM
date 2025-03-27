@@ -1,21 +1,40 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.graphics.Point
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.RelativeLayout
-import com.example.kmamdm.BuildConfig
+import android.widget.Toast
+import androidx.recyclerview.widget.GridLayoutManager
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
+import com.example.kmamdm.helper.ConfigUpdater
+import com.example.kmamdm.helper.ConfigUpdater.UINotifier
+import com.example.kmamdm.model.Application
+import com.example.kmamdm.server.json.ServerConfigResponse
+import com.example.kmamdm.server.repository.ConfigurationRepository
+import com.example.kmamdm.ui.adapter.AppShortcutManager
+import com.example.kmamdm.ui.adapter.BaseAppListAdapter
+import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.screen.base.BaseActivity
+import com.example.kmamdm.utils.AppInfo
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
-    OnLongClickListener {
+    OnLongClickListener, UINotifier, BaseAppListAdapter.OnAppChooseListener,
+    BaseAppListAdapter.SwitchAdapterListener {
     private var exitView: ImageView? = null
     private var infoView: ImageView? = null
     private var updateView: ImageView? = null
+    private var mainAppListAdapter: MainAppListAdapter? = null
+
+    private val configUpdater = ConfigUpdater()
 
     override fun createViewModel() = MainViewModel::class.java
 
@@ -26,7 +45,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     override fun bindViewModel() {
-
+        updateConfig()
     }
 
     private fun createLauncherButtons() {
@@ -118,6 +137,127 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     private fun updateConfig() {
-        configUpdater.updateConfig(this, this)
+        configUpdater.updateConfig(this, this, true)
     }
+
+    /* Start UINotifier */
+
+    override fun onConfigUpdateStart() {
+    }
+
+    override fun onConfigUpdateServerError(errorText: String?) {
+    }
+
+    override fun onConfigUpdateNetworkError(errorText: String?) {
+    }
+
+    override fun onConfigLoaded() {
+    }
+
+    override fun onPoliciesUpdated() {
+    }
+
+//    override fun onFileDownloading(remoteFile: RemoteFile?) {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override fun onDownloadProgress(progress: Int, total: Long, current: Long) {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override fun onFileDownloadError(remoteFile: RemoteFile?) {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override fun onFileInstallError(remoteFile: RemoteFile?) {
+//        TODO("Not yet implemented")
+//    }
+
+    override fun onAppUpdateStart() {
+    }
+
+    override fun onAppRemoving(application: Application?) {
+    }
+
+    override fun onAppDownloading(application: Application?) {
+    }
+
+    override fun onAppInstalling(application: Application?) {
+    }
+
+    override fun onAppDownloadError(application: Application?) {
+    }
+
+    override fun onAppInstallError(packageName: String?) {
+    }
+
+    override fun onAppInstallComplete(packageName: String?) {
+    }
+
+    override fun onConfigUpdateComplete() {
+        showContent()
+    }
+
+    override fun onAllAppInstallComplete() {
+    }
+
+    /* End UINotifier */
+
+    private fun showContent() {
+        if (mainAppListAdapter == null) {
+            val display = windowManager.defaultDisplay
+            val size = Point()
+            display.getSize(size)
+
+            val width = size.x
+            val itemWidth = resources.getDimensionPixelSize(R.dimen.app_list_item_size)
+
+            val spanCount = (width * 1.0f / itemWidth).toInt()
+            mainAppListAdapter = MainAppListAdapter(this, this, this)
+            mainAppListAdapter?.setSpanCount(spanCount)
+
+            mDataBinding.activityMainContent.setLayoutManager(GridLayoutManager(this, spanCount))
+            mDataBinding.activityMainContent.setAdapter(mainAppListAdapter)
+            mainAppListAdapter?.notifyDataSetChanged()
+
+            val bottomAppCount: Int = AppShortcutManager.instance!!.getInstalledAppCount(this, true)
+//            if (bottomAppCount > 0) {
+//                bottomAppListAdapter = BottomAppListAdapter(this, this, this)
+//                bottomAppListAdapter.setSpanCount(spanCount)
+//
+//                binding.activityBottomLayout.setVisibility(View.VISIBLE)
+//                binding.activityBottomLine.setLayoutManager(
+//                    GridLayoutManager(
+//                        this,
+//                        if (bottomAppCount < spanCount) bottomAppCount else spanCount
+//                    )
+//                )
+//                binding.activityBottomLine.setAdapter(bottomAppListAdapter)
+//                bottomAppListAdapter.notifyDataSetChanged()
+//            } else {
+//                bottomAppListAdapter = null
+//                binding.activityBottomLayout.setVisibility(View.GONE)
+//            }
+            mDataBinding.activityBottomLayout.visibility = View.GONE
+        }
+        // We can now sleep, uh
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    /* Start BaseAppListAdapter.OnAppChooseListener */
+
+    override fun onAppChoose(resolveInfo: AppInfo) {
+
+    }
+
+    /* End BaseAppListAdapter.OnAppChooseListener */
+
+
+    /* Start BaseAppListAdapter.SwitchAdapterListener */
+
+    override fun switchAppListAdapter(adapter: BaseAppListAdapter?, direction: Int): Boolean {
+        return true
+    }
+
+    /* End BaseAppListAdapter.SwitchAdapterListener */
 }
