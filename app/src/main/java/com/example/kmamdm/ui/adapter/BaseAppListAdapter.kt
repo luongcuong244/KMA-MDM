@@ -3,6 +3,7 @@ package com.example.kmamdm.ui.adapter
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.Settings
@@ -12,13 +13,17 @@ import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ItemAppBinding
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.AppInfo
-import com.squareup.picasso.Picasso
 
 open class BaseAppListAdapter(
     private val parentActivity: Activity,
@@ -35,8 +40,6 @@ open class BaseAppListAdapter(
     private var layoutManager: RecyclerView.LayoutManager? = null
     private var selectedItemBorder: GradientDrawable
     private var focused: Boolean = true
-
-    private var picasso: Picasso? = null
 
     protected fun initShortcuts() {
         shortcuts = HashMap()
@@ -68,45 +71,36 @@ open class BaseAppListAdapter(
             holder.binding.iconCardView.layoutParams.width = iconSize
             holder.binding.iconCardView.layoutParams.height = iconSize
             if (appInfo.iconUrl != null) {
-//                // Load the icon
-//                if (picasso == null) {
-//                    val builder: Picasso.Builder = Picasso.Builder(parentActivity)
-//                    if (BuildConfig.TRUST_ANY_CERTIFICATE) {
-//                        builder.downloader(OkHttp3Downloader(UnsafeOkHttpClient.getUnsafeOkHttpClient()))
-//                    } else {
-//                        // Add signature to all requests to protect against unauthorized API calls
-//                        // For TRUST_ANY_CERTIFICATE, we won't add signatures because it's unsafe anyway
-//                        // and is just a workaround to use Headwind MDM on the LAN
-//                        val clientWithSignature: OkHttpClient = Builder()
-//                            .cache(
-//                                Cache(
-//                                    File(parentActivity.application.cacheDir, "image_cache"),
-//                                    1000000L
-//                                )
-//                            )
-//                            .addInterceptor(Interceptor { chain: Interceptor.Chain ->
-//                                val requestBuilder: Builder = chain.request().newBuilder()
-//                                val signature: String = InstallUtils.getRequestSignature(
-//                                    chain.request().url().toString()
-//                                )
-//                                if (signature != null) {
-//                                    requestBuilder.addHeader("X-Request-Signature", signature)
-//                                }
-//                                chain.proceed(requestBuilder.build())
-//                            })
-//                            .build()
-//                        builder.downloader(OkHttp3Downloader(clientWithSignature))
-//                    }
-//                    builder.listener { picasso, uri, exception -> // On fault, get the image from the cache
-//                        // This is a workaround against a bug in Picasso: it doesn't display cached images by default!
-//                        picasso.load(appInfo.iconUrl)
-//                            .networkPolicy(NetworkPolicy.OFFLINE)
-//                            .into(holder.binding.imageView)
-//                    }
-//                    picasso = builder.build()
-//                }
-//
-//                picasso?.load(appInfo.iconUrl)?.into(holder.binding.imageView)
+                Glide.with(parentActivity)
+                    .load(appInfo.iconUrl)
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            model: Any,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            return false
+                        }
+
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            holder.binding.imageView.setImageDrawable(
+                                appInfo.packageName?.let {
+                                    parentActivity.packageManager.getApplicationIcon(
+                                        it
+                                    )
+                                }
+                            )
+                            return false
+                        }
+                    })
+                    .into(holder.binding.imageView)
             } else {
                 holder.binding.imageView.setImageDrawable(
                     appInfo.packageName?.let {

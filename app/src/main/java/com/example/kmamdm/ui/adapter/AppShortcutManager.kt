@@ -39,10 +39,13 @@ class AppShortcutManager {
             if (context.packageManager.getLaunchIntentForPackage(p.packageName) != null &&
                 requiredPackages.containsKey(p.packageName)
             ) {
+                val app = requiredPackages[p.packageName]
                 val newInfo = AppInfo()
-                newInfo.name = p.loadLabel(context.packageManager)
-                    .toString()
+                newInfo.name =
+                    if (app?.iconText != null) app.iconText else p.loadLabel(context.packageManager)
+                        .toString()
                 newInfo.packageName = p.packageName
+                newInfo.iconUrl = app?.iconUrl
                 appInfos.add(newInfo)
             }
         }

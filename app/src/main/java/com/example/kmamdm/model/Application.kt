@@ -8,6 +8,6 @@ data class Application(
     @SerializedName("versionName") val versionName: String,
     @SerializedName("versionCode") val versionCode: Int,
     @SerializedName("url") val url: String?,
-    @SerializedName("icon") val icon: String?,
+    @SerializedName("iconUrl") val iconUrl: String?,
     @SerializedName("iconText") val iconText: String?,
 )

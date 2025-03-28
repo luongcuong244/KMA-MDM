@@ -156,6 +156,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     override fun onConfigUpdateServerError(errorText: String?) {
+        showContent()
     }
 
     override fun onConfigUpdateNetworkError(errorText: String?) {
