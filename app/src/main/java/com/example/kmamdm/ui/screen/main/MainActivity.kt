@@ -1,6 +1,7 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Point
 import android.os.Handler
 import android.util.Log
@@ -22,8 +23,10 @@ import com.example.kmamdm.server.repository.ConfigurationRepository
 import com.example.kmamdm.ui.adapter.AppShortcutManager
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
+import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
 import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
+import com.example.kmamdm.utils.Const
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,6 +43,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private var mainAppListAdapter: MainAppListAdapter? = null
 
     private val configUpdater = ConfigUpdater()
+
+    private var downloadAndInstallAppDialog: DownloadAndInstallAppDialog? = null
 
     override fun createViewModel() = MainViewModel::class.java
 
@@ -164,7 +169,9 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     override fun onDownloadProgress(progress: Int, total: Long, current: Long) {
         CoroutineScope(Dispatchers.Main).launch {
-            Log.d("InstallApplication", "Download progress: $current/$total")
+            if (downloadAndInstallAppDialog != null) {
+                downloadAndInstallAppDialog?.showDownloadProgress(progress, total, current)
+            }
         }
     }
 
@@ -190,10 +197,21 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     override fun onAppRemoving(application: Application?) {
     }
 
-    override fun onAppDownloading(application: Application?) {
+    override fun onAppDownloading(application: Application) {
+        if (downloadAndInstallAppDialog == null) {
+            downloadAndInstallAppDialog = DownloadAndInstallAppDialog {
+                downloadAndInstallAppDialog?.showDownloadApp(application)
+            }
+            downloadAndInstallAppDialog?.show(supportFragmentManager, "DownloadAndInstallAppDialog")
+        } else {
+            downloadAndInstallAppDialog?.showDownloadApp(application)
+        }
     }
 
-    override fun onAppInstalling(application: Application?) {
+    override fun onAppInstalling(application: Application) {
+        if (downloadAndInstallAppDialog != null) {
+            downloadAndInstallAppDialog?.showAppInstalling(application)
+        }
     }
 
     override fun onAppDownloadError(application: Application?) {
@@ -206,6 +224,10 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     override fun onConfigUpdateComplete() {
+        if (downloadAndInstallAppDialog != null) {
+            downloadAndInstallAppDialog?.dismiss()
+            downloadAndInstallAppDialog = null
+        }
         showContent()
     }
 

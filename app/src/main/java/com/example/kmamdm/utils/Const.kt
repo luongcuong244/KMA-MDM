@@ -1,6 +1,8 @@
 package com.example.kmamdm.utils
 
 object Const {
+    const val  REQUEST_INSTALL = 1011
+
     const val TASK_SUCCESS: Int = 0
     
     const val TASK_ERROR: Int = 1
@@ -105,7 +107,7 @@ object Const {
     const val MIUI_OPTIMIZATION: Int = 2
 
     
-    val LOG_TAG: String = "HeadwindMDM"
+    val LOG_TAG: String = "KMAMDM"
 
     
     const val SETTINGS_UNBLOCK_TIME: Int = 180000

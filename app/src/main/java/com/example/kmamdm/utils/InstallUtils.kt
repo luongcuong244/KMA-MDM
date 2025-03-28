@@ -5,21 +5,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
-import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageInstaller.SessionParams
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.util.Log
 import androidx.core.content.FileProvider
-import com.example.kmamdm.BuildConfig
-import com.example.kmamdm.model.Application
 import java.io.DataInputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -35,15 +29,10 @@ import javax.net.ssl.X509TrustManager
 
 object InstallUtils {
 
-    private fun areVersionsEqual(v1: String?, c1: Int, v2: String?, c2: Int?): Boolean {
-        if (c2 != null && c2 != 0) {
+    fun areVersionsEqual(v1: String, c1: Int, v2: String, c2: Int): Boolean {
+        if (c2 != 0) {
             // If version code is present, let's compare version codes instead of names
             return c1 == c2
-        }
-
-        if (v1 == null || v2 == null) {
-            // Exceptional case, we should never be here but this shouldn't crash the app with NPE
-            return v1 === v2
         }
 
         // Compare only digits (in Android 9 EMUI on Huawei Honor 8A, getPackageInfo doesn't get letters!)
@@ -52,72 +41,8 @@ object InstallUtils {
         return v1d == v2d
     }
 
-    // Returns -1 if v1 < v2, 0 if v1 == v2 and 1 if v1 > v2
-    fun compareVersions(v1: String?, c1: Int, v2: String?, c2: Int?): Int {
-        if (c2 != null && c2 != 0) {
-            // If version code is present, let's compare version codes instead of names
-            return if (c1 < c2) {
-                -1
-            } else if (c1 > c2) {
-                1
-            } else {
-                0
-            }
-        }
-
-        // Exceptional cases: null values
-        if (v1 == null && v2 == null) {
-            return 0
-        }
-        if (v1 == null) {
-            return -1
-        }
-        if (v2 == null) {
-            return 1
-        }
-        // Versions are numbers separated by a dot
-        val v1d = v1.replace("[^\\d.]".toRegex(), "")
-        val v2d = v2.replace("[^\\d.]".toRegex(), "")
-
-        val v1n = v1d.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-        val v2n = v2d.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-
-        // One version could contain more digits than another
-        val count = if (v1n.size < v2n.size) v1n.size else v2n.size
-
-        for (n in 0 until count) {
-            try {
-                val n1 = v1n[n].toInt()
-                val n2 = v2n[n].toInt()
-                if (n1 < n2) {
-                    return -1
-                } else if (n1 > n2) {
-                    return 1
-                }
-                // If major version numbers are equals, continue to compare minor version numbers
-            } catch (e: Exception) {
-                return 0
-            }
-        }
-
-        // Here we are if common parts are equal
-        // Now we decide that if a version has more parts, it is considered as greater
-        if (v1n.size < v2n.size) {
-            return -1
-        } else if (v1n.size > v2n.size) {
-            return 1
-        }
-        return 0
-    }
-
-
-    fun getAppTempPath(context: Context, strUrl: String): String {
-        val tempFile = File(context.getExternalFilesDir(null), getFileName(strUrl))
-        return tempFile.absolutePath
-    }
-
     @Throws(Exception::class)
-    fun downloadFile(context: Context, strUrl: String, progressHandler: DownloadProgress): File? {
+    fun downloadFile(context: Context, strUrl: String, progressHandler: DownloadProgress): File {
         var tempFile = File(context.getExternalFilesDir(null), getFileName(strUrl))
         if (tempFile.exists()) {
             tempFile.delete()
@@ -196,6 +121,10 @@ object InstallUtils {
         errorHandler: InstallErrorHandler
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return
+        }
+
+        if (!Utils.canInstallPackages(context)) {
             return
         }
 

@@ -120,4 +120,9 @@
         -->
         <item>isrg_root_x1.pem</item>
     </string-array>
+
+
+    <!-- New strings -->
+    <string name="downloading">Downloading…</string>
+    <string name="installing">Installing…</string>
 </resources>

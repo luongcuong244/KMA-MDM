@@ -65,8 +65,8 @@ open class BaseAppListAdapter(
             var iconScale: Int = 100
             val iconSize =
                 parentActivity.resources.getDimensionPixelOffset(R.dimen.app_icon_size) * iconScale / 100
-            holder.binding.imageView.layoutParams.width = iconSize
-            holder.binding.imageView.layoutParams.height = iconSize
+            holder.binding.iconCardView.layoutParams.width = iconSize
+            holder.binding.iconCardView.layoutParams.height = iconSize
             if (appInfo.iconUrl != null) {
 //                // Load the icon
 //                if (picasso == null) {
