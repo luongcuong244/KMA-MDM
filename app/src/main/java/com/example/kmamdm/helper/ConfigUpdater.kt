@@ -186,6 +186,7 @@ class ConfigUpdater {
                         checkAndInstallApplications(config)
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
+                            configInitializing = false
                             // save config to share pref
                             SettingsHelper.getInstance(context).updateConfig(config)
                             uiNotifier?.onConfigUpdateComplete()

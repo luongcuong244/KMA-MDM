@@ -1,38 +1,42 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
-import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.Point
-import android.os.Handler
+import android.graphics.drawable.Drawable
 import android.util.Log
+import android.view.Surface
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.RelativeLayout
-import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
+import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
 import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
+import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
-import com.example.kmamdm.server.json.ServerConfigResponse
-import com.example.kmamdm.server.repository.ConfigurationRepository
-import com.example.kmamdm.ui.adapter.AppShortcutManager
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
 import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
 import com.example.kmamdm.utils.Const
+import com.example.kmamdm.utils.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
     OnLongClickListener, UINotifier, BaseAppListAdapter.OnAppChooseListener,
@@ -43,6 +47,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private var mainAppListAdapter: MainAppListAdapter? = null
 
     private val configUpdater = ConfigUpdater()
+    private var needRedrawContentAfterReconfigure = false
+    private var orientationLocked = false
 
     private var downloadAndInstallAppDialog: DownloadAndInstallAppDialog? = null
 
@@ -147,6 +153,11 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     private fun updateConfig() {
+        needRedrawContentAfterReconfigure = true
+        if (!orientationLocked) {
+            lockOrientation()
+            orientationLocked = true
+        }
         configUpdater.updateConfig(this, this, true)
     }
 
@@ -238,6 +249,60 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     /* End UINotifier */
 
     private fun showContent() {
+        val config = SettingsHelper.getInstance(this).getConfig()
+
+        if (orientationLocked) {
+            if (config != null) {
+                Utils.setOrientation(this, config)
+            }
+            orientationLocked = false
+        }
+
+        // TODO: Somehow binding is null here which causes a crash. Not sure why this could happen.
+        if (config?.backgroundColor != null) {
+            try {
+                mDataBinding.activityMainContentWrapper.setBackgroundColor(Color.parseColor(config.backgroundColor))
+            } catch (e: java.lang.Exception) {
+                // Invalid color
+                e.printStackTrace()
+                mDataBinding.activityMainContentWrapper.setBackgroundColor(resources.getColor(R.color.defaultBackground))
+            }
+        } else {
+            mDataBinding.activityMainContentWrapper.setBackgroundColor(resources.getColor(R.color.defaultBackground))
+        }
+
+        if (mainAppListAdapter == null || needRedrawContentAfterReconfigure) {
+            if (config?.backgroundImageUrl != null && config.backgroundImageUrl.isNotEmpty()) {
+                mDataBinding.activityMainBackground.visibility = View.VISIBLE
+                Glide.with(this)
+                    .load(config.backgroundImageUrl)
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            model: Any,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            return false
+                        }
+
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            mDataBinding.activityMainBackground.visibility = View.GONE
+                            return false
+                        }
+                    })
+                    .into(mDataBinding.activityMainBackground)
+            } else {
+                mDataBinding.activityMainBackground.visibility = View.GONE
+            }
+        }
+
         if (mainAppListAdapter == null) {
             val display = windowManager.defaultDisplay
             val size = Point()
@@ -254,25 +319,9 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             mDataBinding.activityMainContent.setAdapter(mainAppListAdapter)
             mainAppListAdapter?.notifyDataSetChanged()
 
-            val bottomAppCount: Int = AppShortcutManager.instance!!.getInstalledAppCount(this, true)
-//            if (bottomAppCount > 0) {
-//                bottomAppListAdapter = BottomAppListAdapter(this, this, this)
-//                bottomAppListAdapter.setSpanCount(spanCount)
-//
-//                binding.activityBottomLayout.setVisibility(View.VISIBLE)
-//                binding.activityBottomLine.setLayoutManager(
-//                    GridLayoutManager(
-//                        this,
-//                        if (bottomAppCount < spanCount) bottomAppCount else spanCount
-//                    )
-//                )
-//                binding.activityBottomLine.setAdapter(bottomAppListAdapter)
-//                bottomAppListAdapter.notifyDataSetChanged()
-//            } else {
-//                bottomAppListAdapter = null
-//                binding.activityBottomLayout.setVisibility(View.GONE)
-//            }
             mDataBinding.activityBottomLayout.visibility = View.GONE
+        } else {
+            mainAppListAdapter?.notifyDataSetChanged()
         }
         // We can now sleep, uh
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -294,4 +343,18 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     /* End BaseAppListAdapter.SwitchAdapterListener */
+
+    private fun lockOrientation() {
+        val orientation = resources.configuration.orientation
+        val rotation = windowManager.defaultDisplay.rotation
+        Log.d(
+            Const.LOG_TAG,
+            "Lock orientation: orientation=$orientation, rotation=$rotation"
+        )
+        requestedOrientation = if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+            if (rotation < Surface.ROTATION_180) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+        } else {
+            if (rotation < Surface.ROTATION_180) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+        }
+    }
 }

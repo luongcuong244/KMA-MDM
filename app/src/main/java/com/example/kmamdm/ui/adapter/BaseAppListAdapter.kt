@@ -22,8 +22,8 @@ import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ItemAppBinding
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.ServerConfig
-import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.AppInfo
+import com.example.kmamdm.utils.Const
 
 open class BaseAppListAdapter(
     private val parentActivity: Activity,
@@ -62,10 +62,20 @@ open class BaseAppListAdapter(
         holder.binding.rootLinearLayout.tag = appInfo
         holder.binding.textView.text = appInfo.name
 
-        holder.binding.textView.setTextColor(Color.WHITE)
+        if (settingsHelper.getConfig()?.textColor != null && !settingsHelper.getConfig()?.textColor?.trim().equals("")) {
+            try {
+                holder.binding.textView.setTextColor(
+                    Color.parseColor(
+                        settingsHelper.getConfig()!!.textColor
+                    )
+                )
+            } catch (e: java.lang.Exception) {
+                holder.binding.textView.setTextColor(Color.WHITE)
+            }
+        }
 
         try {
-            var iconScale: Int = 100
+            val iconScale = settingsHelper.getConfig()?.iconSize ?: 100
             val iconSize =
                 parentActivity.resources.getDimensionPixelOffset(R.dimen.app_icon_size) * iconScale / 100
             holder.binding.iconCardView.layoutParams.width = iconSize
