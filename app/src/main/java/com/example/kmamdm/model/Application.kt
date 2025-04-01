@@ -10,4 +10,9 @@ data class Application(
     @SerializedName("url") val url: String?,
     @SerializedName("iconUrl") val iconUrl: String?,
     @SerializedName("iconText") val iconText: String?,
+    @SerializedName("screenOrder") val screenOrder: Int,
+    @SerializedName("showIcon") val showIcon: Boolean,
+    @SerializedName("remove") val remove: Boolean,
+    @SerializedName("runAfterInstall") val runAfterInstall: Boolean,
+    @SerializedName("runAtBoot") val runAtBoot: Boolean,
 )

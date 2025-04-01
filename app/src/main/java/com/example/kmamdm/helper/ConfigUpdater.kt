@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ConditionVariable
 import android.util.Log
@@ -183,6 +184,7 @@ class ConfigUpdater {
                     registerAppInstallReceiver()
 
                     CoroutineScope(Dispatchers.IO).launch {
+                        checkAndUninstallApplication(config)
                         checkAndInstallApplications(config)
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
@@ -202,11 +204,23 @@ class ConfigUpdater {
         })
     }
 
+    suspend fun checkAndUninstallApplication(config: ServerConfig) = withContext(Dispatchers.IO) {
+        val applications = config.applications
+        for (application in applications) {
+            // if the url is null -> system app -> do not uninstall
+            if (application.url != null && application.remove) {
+                withContext(Dispatchers.Main) {
+                    uiNotifier?.onAppRemoving(application)
+                }
+            }
+        }
+    }
+
     suspend fun checkAndInstallApplications(config: ServerConfig) = withContext(Dispatchers.IO) {
         val applications = config.applications
         for (application in applications) {
             // Check if the app is already installed and update is needed
-            if (application.url != null && shouldUpdateApplication(application)) {
+            if (application.url != null && !application.remove && shouldUpdateApplication(application)) {
                 withContext(Dispatchers.Main) {
                     uiNotifier?.onAppDownloading(application)
                 }
@@ -247,12 +261,21 @@ class ConfigUpdater {
     private fun shouldUpdateApplication(application: Application): Boolean {
         val oldConfig = SettingsHelper.getInstance(context!!).getConfig()
         val oldConfigApplications = oldConfig?.applications ?: emptyList()
-        val oldApplication = oldConfigApplications.find { it.pkg == application.pkg }
+        val oldApplication = oldConfigApplications.find { it.pkg == application.pkg && !it.remove }
         return oldApplication == null || !InstallUtils.areVersionsEqual(
             application.versionName,
             application.versionCode,
             oldApplication.versionName,
             oldApplication.versionCode
         )
+    }
+
+    private fun isAppInstalled(context: Context, packageName: String): Boolean {
+        return try {
+            context.packageManager.getApplicationInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 }

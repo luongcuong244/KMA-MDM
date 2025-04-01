@@ -46,6 +46,7 @@ class AppShortcutManager {
                         .toString()
                 newInfo.packageName = p.packageName
                 newInfo.iconUrl = app?.iconUrl
+                newInfo.screenOrder = app?.screenOrder
                 appInfos.add(newInfo)
             }
         }
@@ -65,7 +66,9 @@ class AppShortcutManager {
             val applications: List<Application> =
                 SettingsHelper.getInstance(context).getConfig()!!.applications
             for (application in applications) {
-                requiredPackages[application.pkg] = application
+                if (application.showIcon && !application.remove) {
+                    requiredPackages[application.pkg] = application
+                }
             }
         }
     }

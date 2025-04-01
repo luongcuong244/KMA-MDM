@@ -301,9 +301,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             } else {
                 mDataBinding.activityMainBackground.visibility = View.GONE
             }
-        }
 
-        if (mainAppListAdapter == null) {
             val display = windowManager.defaultDisplay
             val size = Point()
             display.getSize(size)
@@ -323,6 +321,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         } else {
             mainAppListAdapter?.notifyDataSetChanged()
         }
+
         // We can now sleep, uh
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
