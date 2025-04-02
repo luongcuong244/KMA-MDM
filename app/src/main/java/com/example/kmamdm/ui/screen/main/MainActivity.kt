@@ -6,6 +6,9 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Point
 import android.graphics.drawable.Drawable
+import android.os.AsyncTask
+import android.os.Bundle
+import android.os.Handler
 import android.util.Log
 import android.view.Surface
 import android.view.View
@@ -27,6 +30,7 @@ import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
+import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
@@ -34,6 +38,7 @@ import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.Utils
+import com.hmdm.launcher.helper.Initializer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,12 +54,54 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private val configUpdater = ConfigUpdater()
     private var needRedrawContentAfterReconfigure = false
     private var orientationLocked = false
+    private var firstStartAfterProvisioning = false
 
     private var downloadAndInstallAppDialog: DownloadAndInstallAppDialog? = null
+
+    private val handler = Handler()
 
     override fun createViewModel() = MainViewModel::class.java
 
     override fun getContentView(): Int = R.layout.activity_main
+
+//    override fun onCreate(savedInstanceState: Bundle?) {
+//        super.onCreate(savedInstanceState)
+//        val intent = intent
+//        Log.d(
+//            Const.LOG_TAG,
+//            "MainActivity started" + (if (intent != null && intent.action != null) ", action: " + intent.action else "")
+//        )
+//        if (intent != null && "android.app.action.PROVISIONING_SUCCESSFUL".equals(
+//                intent.action,
+//                ignoreCase = true
+//            )
+//        ) {
+//            firstStartAfterProvisioning = true
+//        }
+//        Initializer.init(this)
+//    }
+//
+//    override fun onResume() {
+//        super.onResume()
+//        if (firstStartAfterProvisioning) {
+//            firstStartAfterProvisioning = false
+//            waitForProvisioning(10)
+//        } else {
+//            setDefaultLauncherEarly()
+//        }
+//    }
+//
+//    private fun waitForProvisioning(attempts: Int) {
+//        if (Utils.isDeviceOwner(this) || attempts <= 0) {
+//            setDefaultLauncherEarly()
+//        } else {
+//            handler.postDelayed({ waitForProvisioning(attempts - 1) }, 1000)
+//        }
+//    }
+//
+//    private fun setDefaultLauncherEarly() {
+//        checkAndStartLauncher()
+//    }
 
     override fun initView() {
         createLauncherButtons()
@@ -206,7 +253,10 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     override fun onAppUpdateStart() {
     }
 
-    override fun onAppRemoving(application: Application?) {
+    override fun onAppRemoving(application: Application) {
+        if (downloadAndInstallAppDialog != null) {
+            downloadAndInstallAppDialog?.showAppRemoving(application)
+        }
     }
 
     override fun onAppDownloading(application: Application) {
@@ -250,6 +300,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     private fun showContent() {
         val config = SettingsHelper.getInstance(this).getConfig()
+
+        scheduleInstalledAppsRun()
 
         if (orientationLocked) {
             if (config != null) {
@@ -355,5 +407,29 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         } else {
             if (rotation < Surface.ROTATION_180) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
         }
+    }
+
+    private fun scheduleInstalledAppsRun() {
+        val applicationsForRun = configUpdater.getApplicationsForRun()
+
+        if (applicationsForRun.isEmpty()) {
+            return
+        }
+        var pause: Int = PAUSE_BETWEEN_AUTORUNS_SEC
+        while (applicationsForRun.isNotEmpty()) {
+            val application = applicationsForRun[0]
+            applicationsForRun.removeAt(0)
+            handler.postDelayed({
+                val launchIntent = packageManager.getLaunchIntentForPackage(application.pkg)
+                if (launchIntent != null) {
+                    startActivity(launchIntent)
+                }
+            }, (pause * 1000).toLong())
+            pause += PAUSE_BETWEEN_AUTORUNS_SEC
+        }
+    }
+
+    companion object {
+        private const val PAUSE_BETWEEN_AUTORUNS_SEC = 3
     }
 }

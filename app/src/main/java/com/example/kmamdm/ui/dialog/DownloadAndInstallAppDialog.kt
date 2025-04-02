@@ -79,6 +79,15 @@ class DownloadAndInstallAppDialog(
         binding.progress.isIndeterminate = true
     }
 
+    fun showAppRemoving(application: Application) {
+        if (!isAdded || !isInitBinding) return
+
+        binding.tvTitle.text = getString(R.string.removing)
+        binding.tvAppName.text = application.name
+        binding.tvProgress.visibility = View.GONE
+        binding.progress.isIndeterminate = true
+    }
+
     // Chuyển đổi byte thành MB hoặc KB cho dễ đọc
     private fun formatFileSize(size: Long): String {
         return if (size >= 1024 * 1024) {

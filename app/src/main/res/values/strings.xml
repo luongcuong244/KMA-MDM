@@ -125,4 +125,5 @@
     <!-- New strings -->
     <string name="downloading">Downloading…</string>
     <string name="installing">Installing…</string>
+    <string name="removing">Removing…</string>
 </resources>

@@ -12,6 +12,13 @@ import android.util.Log
 import com.example.kmamdm.model.ServerConfig
 
 object Utils {
+    fun isDeviceOwner(context: Context): Boolean {
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        return dpm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && dpm.isDeviceOwnerApp(
+            context.packageName
+        )
+    }
+
     fun canInstallPackages(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // Global setting works for Android 7 and below

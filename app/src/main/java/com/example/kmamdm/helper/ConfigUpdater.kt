@@ -39,7 +39,7 @@ class ConfigUpdater {
         //        fun onFileDownloadError(remoteFile: RemoteFile?)
 //        fun onFileInstallError(remoteFile: RemoteFile?)
         fun onAppUpdateStart()
-        fun onAppRemoving(application: Application?)
+        fun onAppRemoving(application: Application)
         fun onAppDownloading(application: Application)
         fun onAppInstalling(application: Application)
         fun onAppDownloadError(application: Application?)
@@ -55,6 +55,13 @@ class ConfigUpdater {
     private var userInteraction = false
     private var appInstallReceiver: BroadcastReceiver? = null
     private var conditionVariable = ConditionVariable()
+    private val applicationsForRun = mutableListOf<Application>()
+
+    companion object {
+        fun forceConfigUpdate(context: Context, notifier: UINotifier?, userInteraction: Boolean) {
+            ConfigUpdater().updateConfig(context, notifier, userInteraction)
+        }
+    }
 
     private fun registerAppInstallReceiver() {
         if (appInstallReceiver == null) {
@@ -186,6 +193,7 @@ class ConfigUpdater {
                     CoroutineScope(Dispatchers.IO).launch {
                         checkAndUninstallApplication(config)
                         checkAndInstallApplications(config)
+                        checkApplicationsForRun(config)
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
                             configInitializing = false
@@ -209,8 +217,14 @@ class ConfigUpdater {
         for (application in applications) {
             // if the url is null -> system app -> do not uninstall
             if (application.url != null && application.remove) {
-                withContext(Dispatchers.Main) {
-                    uiNotifier?.onAppRemoving(application)
+                if (isAppInstalled(context!!, application.pkg)) {
+                    withContext(Dispatchers.Main) {
+                        uiNotifier?.onAppRemoving(application)
+                    }
+                    // Đóng conditionVariable trước khi block để đảm bảo nó chặn đúng cách
+                    conditionVariable.close()
+                    InstallUtils.silentUninstallApplication(context!!, application.pkg)
+                    conditionVariable.block()
                 }
             }
         }
@@ -258,6 +272,16 @@ class ConfigUpdater {
         }
     }
 
+    suspend fun checkApplicationsForRun(config: ServerConfig) = withContext(Dispatchers.IO) {
+        applicationsForRun.clear()
+        val applications = config.applications
+        for (application in applications) {
+            if (application.runAfterInstall) {
+                applicationsForRun.add(application)
+            }
+        }
+    }
+
     private fun shouldUpdateApplication(application: Application): Boolean {
         val oldConfig = SettingsHelper.getInstance(context!!).getConfig()
         val oldConfigApplications = oldConfig?.applications ?: emptyList()
@@ -277,5 +301,9 @@ class ConfigUpdater {
         } catch (e: PackageManager.NameNotFoundException) {
             false
         }
+    }
+
+    fun getApplicationsForRun(): MutableList<Application> {
+        return applicationsForRun
     }
 }
