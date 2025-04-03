@@ -9,4 +9,5 @@ data class ServerConfig(
     @SerializedName("textColor") val textColor: String?,
     @SerializedName("iconSize") val iconSize: Int = 100,
     @SerializedName("orientation") val orientation: Int = 0,
+    @SerializedName("runDefaultLauncher") val runDefaultLauncher: Boolean?,
 )

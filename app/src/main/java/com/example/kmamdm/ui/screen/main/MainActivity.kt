@@ -38,7 +38,6 @@ import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.Utils
-import com.hmdm.launcher.helper.Initializer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

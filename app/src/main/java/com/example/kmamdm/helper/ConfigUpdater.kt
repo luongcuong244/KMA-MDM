@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
+import android.os.AsyncTask
 import android.os.Build
 import android.os.ConditionVariable
 import android.util.Log
@@ -17,6 +18,7 @@ import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.InstallUtils
+import com.example.kmamdm.utils.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -194,6 +196,7 @@ class ConfigUpdater {
                         checkAndUninstallApplication(config)
                         checkAndInstallApplications(config)
                         checkApplicationsForRun(config)
+                        setDefaultLauncher(context, config)
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
                             configInitializing = false
@@ -278,6 +281,22 @@ class ConfigUpdater {
         for (application in applications) {
             if (application.runAfterInstall) {
                 applicationsForRun.add(application)
+            }
+        }
+    }
+
+    suspend fun setDefaultLauncher(context: Context, config: ServerConfig) = withContext(Dispatchers.IO) {
+        if (Utils.isDeviceOwner(context)) {
+            val needSetLauncher =
+                (config.runDefaultLauncher == null || !config.runDefaultLauncher)
+            val defaultLauncher: String? = Utils.getDefaultLauncher(context)
+            defaultLauncher?.let {
+                if (needSetLauncher && !context.packageName.equals(defaultLauncher, ignoreCase = true)
+                ) {
+                    Utils.setDefaultLauncher(context)
+                } else if (!needSetLauncher && context.packageName.equals(defaultLauncher, ignoreCase = true)) {
+                    Utils.clearDefaultLauncher(context)
+                }
             }
         }
     }
