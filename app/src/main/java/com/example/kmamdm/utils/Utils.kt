@@ -13,7 +13,6 @@ import android.os.Build
 import android.provider.Settings
 import android.provider.Settings.SettingNotFoundException
 import android.util.Log
-import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.screen.main.MainActivity
 
@@ -77,6 +76,19 @@ object Utils {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         Log.i(Const.LOG_TAG, "Set orientation: $loggedOrientation")
+    }
+
+    fun isLauncherIntent(intent: Intent?): Boolean {
+        if (intent == null) {
+            return false
+        }
+        val categories = intent.categories ?: return false
+        for (c in categories) {
+            if (c == Intent.CATEGORY_LAUNCHER) {
+                return true
+            }
+        }
+        return false
     }
 
     fun setDefaultLauncher(context: Context) {

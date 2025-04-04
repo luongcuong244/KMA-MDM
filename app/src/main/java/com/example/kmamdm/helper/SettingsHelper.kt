@@ -49,8 +49,24 @@ class SettingsHelper(context: Context) {
         return config
     }
 
+    fun isKioskModeRunning(): Boolean {
+        return sharedPreferences.getBoolean(
+            PACKAGE_NAME + PREF_KEY_KIOSK_MODE_RUNNING,
+            false
+        )
+    }
+
+    fun setKioskModeRunning(isRunning: Boolean) {
+        sharedPreferences.edit()
+            .putBoolean(PACKAGE_NAME + PREF_KEY_KIOSK_MODE_RUNNING, isRunning)
+            .commit()
+    }
+
     companion object {
         private const val PREFERENCES_ID = ".helpers.PREFERENCES"
+        private const val PREF_KEY_CONFIG = ".helpers.CONFIG"
+        private const val PREF_KEY_KIOSK_MODE_RUNNING = ".helpers.KIOSK_MODE_RUNNING"
+
         private const val PREF_KEY_BASE_URL = ".helpers.BASE_URL"
         private const val PREF_KEY_SECONDARY_BASE_URL = ".helpers.SECONDARY_BASE_URL"
         private const val PREF_KEY_SERVER_PROJECT = ".helpers.SERVER_PROJECT"
@@ -59,7 +75,6 @@ class SettingsHelper(context: Context) {
         private const val PREF_KEY_CONFIG_NAME = ".helpers.CONFIG_NAME"
         private const val PREF_KEY_GROUP = ".helpers.GROUP"
         private const val PREF_KEY_DEVICE_ID_USE = ".helpers.DEVICE_ID_USE"
-        private const val PREF_KEY_CONFIG = ".helpers.CONFIG"
         private const val PREF_KEY_IP_ADDRESS = ".helpers.IP_ADDRESS"
         private const val PREF_QR_PROVISIONING = ".helpers.QR_PROVISIONING"
         private const val PREF_CFG_UPDATE_TIMESTAMP = ".helpers.CFG_UPDATE_TIMESTAMP"

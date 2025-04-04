@@ -1,13 +1,12 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Point
 import android.graphics.drawable.Drawable
-import android.os.AsyncTask
-import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.view.Surface
@@ -23,14 +22,13 @@ import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
-import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
 import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
-import com.example.kmamdm.model.ServerConfig
+import com.example.kmamdm.pro.KioskUtils
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
@@ -300,13 +298,52 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private fun showContent() {
         val config = SettingsHelper.getInstance(this).getConfig()
 
+        if (config == null) {
+            Log.e(Const.LOG_TAG, "Config is null")
+            return
+        }
+
         scheduleInstalledAppsRun()
 
+        // Run default launcher option
+        if (config.runDefaultLauncher != null && config.runDefaultLauncher && !packageName.equals(Utils.getDefaultLauncher(this)) && !Utils.isLauncherIntent(intent)
+        ) {
+            openDefaultLauncher()
+            return
+        }
+
         if (orientationLocked) {
-            if (config != null) {
-                Utils.setOrientation(this, config)
-            }
+            Utils.setOrientation(this, config)
             orientationLocked = false
+        }
+
+        if (config.kioskMode == true) {
+            val kioskApp = config.mainApp
+            if (kioskApp != null && kioskApp.trim().isNotEmpty() &&
+                // If KMA MDM itself is set as kiosk app, the kiosk mode is already turned on;
+                // So here we just proceed to drawing the content
+                (kioskApp != packageName || !KioskUtils.isKioskModeRunning(this))
+            ) {
+                if (KioskUtils.getKioskAppIntent(kioskApp, this) != null && startKiosk(kioskApp)) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    return
+                } else {
+                    Log.e(Const.LOG_TAG, "Kiosk mode failed, proceed with the default flow")
+                }
+            } else {
+                if (kioskApp != null && kioskApp == packageName && KioskUtils.isKioskModeRunning(this)) {
+                    // Here we go if the configuration is changed when launcher is in the kiosk mode
+                    KioskUtils.updateKioskAllowedApps(kioskApp, this, false)
+                } else {
+                    Log.e(Const.LOG_TAG, "Kiosk mode disabled: please setup the main app!")
+                }
+            }
+        } else {
+            if (KioskUtils.isKioskModeRunning(this)) {
+                // Turn off kiosk and show desktop if it is turned off in the configuration
+                KioskUtils.unlockKiosk(this)
+                openDefaultLauncher()
+            }
         }
 
         // TODO: Somehow binding is null here which causes a crash. Not sure why this could happen.
@@ -377,6 +414,10 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    private fun startKiosk(kioskApp: String): Boolean {
+        return KioskUtils.startCosuKioskMode(kioskApp, this@MainActivity)
+    }
+
     /* Start BaseAppListAdapter.OnAppChooseListener */
 
     override fun onAppChoose(resolveInfo: AppInfo) {
@@ -406,6 +447,14 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         } else {
             if (rotation < Surface.ROTATION_180) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
         }
+    }
+
+    // Run default launcher (Headwind MDM) as if the user clicked Home button
+    private fun openDefaultLauncher() {
+        val intent = Intent(Intent.ACTION_MAIN)
+        intent.addCategory(Intent.CATEGORY_HOME)
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        startActivity(intent)
     }
 
     private fun scheduleInstalledAppsRun() {
