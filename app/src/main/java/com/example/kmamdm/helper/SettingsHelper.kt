@@ -3,7 +3,6 @@ package com.example.kmamdm.helper
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.kmamdm.model.ServerConfig
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.gson.Gson
 
 class SettingsHelper(context: Context) {

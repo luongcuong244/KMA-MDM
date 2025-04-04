@@ -14,6 +14,13 @@ class AdminReceiver : DeviceAdminReceiver() {
         Toast.makeText(context, "Device administrator activated", Toast.LENGTH_LONG).show()
     }
 
+    override fun onDisabled(context: Context, intent: Intent) {
+        super.onDisabled(context, intent)
+        val preferences = context.applicationContext.getSharedPreferences(Const.PREFERENCES, Context.MODE_PRIVATE)
+        preferences.edit().putInt(Const.PREFERENCES_ADMINISTRATOR, Const.PREFERENCES_OFF).commit()
+        Toast.makeText(context, "Device administrator deactivated", Toast.LENGTH_LONG).show()
+    }
+
 //    override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
 //        val preferences =
 //            context.applicationContext.getSharedPreferences(Const.PREFERENCES, Context.MODE_PRIVATE)

@@ -70,29 +70,6 @@ class PermissionActivity : AppCompatActivity() {
                 }
             }
         }
-
-//        val accessibilityService = preferences.getInt(Const.PREFERENCES_ACCESSIBILITY_SERVICE, -1)
-//        // Check the same condition as for usage stats here
-//        // because accessibility is used as a secondary condition when usage stats is not available
-//        if (ProUtils.isPro() && accessibilityService == -1 && needRequestUsageStats()) {
-//            if (checkAccessibilityService()) {
-//                preferences.edit
-//                ().putInt
-//                (Const.PREFERENCES_ACCESSIBILITY_SERVICE, Const.PREFERENCES_ON).commit
-//                ()
-//            } else {
-//                createAndShowAccessibilityServiceDialog()
-//                return
-//            }
-//        }
-
-//        if (settingsHelper != null && settingsHelper.getConfig() != null && settingsHelper.getConfig()
-//                .getLockStatusBar() != null && settingsHelper.getConfig().getLockStatusBar()
-//        ) {
-//            // If the admin requested status bar lock (may be required for some early Samsung devices), block the status bar and right bar (App list) expansion
-//            statusBarView = ProUtils.preventStatusBarExpansion(this)
-//            rightToolbarView = ProUtils.preventApplicationsList(this)
-//        }
         startActivity(Intent(this, MainActivity::class.java))
     }
 

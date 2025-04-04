@@ -1,7 +1,6 @@
 package com.example.kmamdm.utils
 
 import android.annotation.SuppressLint
-import android.annotation.TargetApi
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -14,10 +13,13 @@ import android.os.Build
 import android.provider.Settings
 import android.provider.Settings.SettingNotFoundException
 import android.util.Log
+import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.screen.main.MainActivity
 
 object Utils {
+    // use this command to set the device owner     ->      adb shell dpm set-device-owner com.example.kmamdm/.AdminReceiver
+    // use this command to clear the device owner   ->      adb shell dpm remove-active-admin com.example.kmamdm/.AdminReceiver
     fun isDeviceOwner(context: Context): Boolean {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         return dpm.isDeviceOwnerApp(context.packageName)
@@ -51,8 +53,7 @@ object Utils {
     }
 
     fun canDrawOverlays(context: Context?): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-                Settings.canDrawOverlays(context)
+        return Settings.canDrawOverlays(context)
     }
 
     @SuppressLint("SourceLockedOrientationActivity")
@@ -78,11 +79,7 @@ object Utils {
         Log.i(Const.LOG_TAG, "Set orientation: $loggedOrientation")
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     fun setDefaultLauncher(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return
-        }
         val filter = IntentFilter(Intent.ACTION_MAIN)
         filter.addCategory(Intent.CATEGORY_HOME)
         filter.addCategory(Intent.CATEGORY_DEFAULT)
@@ -91,42 +88,74 @@ object Utils {
         setPreferredActivity(context, filter, activity)
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     fun clearDefaultLauncher(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return
-        }
         val filter = IntentFilter(Intent.ACTION_MAIN)
         filter.addCategory(Intent.CATEGORY_HOME)
         filter.addCategory(Intent.CATEGORY_DEFAULT)
         setPreferredActivity(context, filter, null)
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private fun setPreferredActivity(
         context: Context,
         filter: IntentFilter,
         activity: ComponentName?
     ) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return
-        }
         // Set the activity as the preferred option for the device.
         val adminComponentName = LegacyUtils.getAdminComponentName(context)
         val dpm =
             context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         try {
+            val allLaunchers = getAllLaunchers(context)
             if (activity != null) {
+                // Clear the preferred activity for all launchers except the current package. I don't really sure it's ok but it works for me :))
+                for (launcher in allLaunchers) {
+                    if (launcher.packageName == context.packageName) {
+                        continue
+                    }
+                    dpm.clearPackagePersistentPreferredActivities(
+                        adminComponentName,
+                        launcher.packageName
+                    )
+                }
                 dpm.addPersistentPreferredActivity(adminComponentName, filter, activity)
             } else {
                 dpm.clearPackagePersistentPreferredActivities(
                     adminComponentName,
                     context.packageName
                 )
+                // Add the preferred activity for all launchers except the current package. I don't really sure it's ok but it works for me :))
+                for (launcher in allLaunchers) {
+                    if (launcher.packageName == context.packageName) {
+                        continue
+                    }
+                    dpm.addPersistentPreferredActivity(
+                        adminComponentName,
+                        filter,
+                        ComponentName(launcher.packageName, launcher.name)
+                    )
+                }
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun getAllLaunchers(context: Context): List<ActivityInfo> {
+        val localPackageManager = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN)
+        intent.addCategory(Intent.CATEGORY_HOME)
+        val resolveInfoList = localPackageManager.queryIntentActivities(
+            intent,
+            PackageManager.MATCH_DEFAULT_ONLY
+        )
+        val launchers = ArrayList<ActivityInfo>()
+        for (resolveInfo in resolveInfoList) {
+            val activityInfo = resolveInfo.activityInfo
+            if (activityInfo != null) {
+                launchers.add(activityInfo)
+            }
+        }
+        return launchers
     }
 
     fun getDefaultLauncher(context: Context): String? {
@@ -146,5 +175,39 @@ object Utils {
             return null
         }
         return info.activityInfo
+    }
+
+    fun releaseUserRestrictions(context: Context, restrictions: String) {
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+            return
+        }
+
+        val restrictionList =
+            restrictions.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        for (r in restrictionList) {
+            try {
+                dpm.clearUserRestriction(adminComponentName, r.trim { it <= ' ' })
+            } catch (_: java.lang.Exception) {
+            }
+        }
+    }
+
+    fun lockUserRestrictions(context: Context, restrictions: String) {
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        if (!dpm.isDeviceOwnerApp(context.packageName)) {
+            return
+        }
+
+        val restrictionList =
+            restrictions.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+        for (r in restrictionList) {
+            try {
+                dpm.addUserRestriction(adminComponentName, r.trim { it <= ' ' })
+            } catch (_: java.lang.Exception) {
+            }
+        }
     }
 }

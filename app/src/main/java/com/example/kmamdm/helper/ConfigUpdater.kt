@@ -7,9 +7,9 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
-import android.os.AsyncTask
 import android.os.Build
 import android.os.ConditionVariable
+import android.os.UserManager
 import android.util.Log
 import android.widget.Toast
 import com.example.kmamdm.model.Application
@@ -152,7 +152,6 @@ class ConfigUpdater {
                 // Receiver not registered
                 e.printStackTrace()
             }
-            appInstallReceiver = null
         }
     }
 
@@ -168,19 +167,16 @@ class ConfigUpdater {
         this.uiNotifier = uiNotifier
         this.userInteraction = userInteraction
 
+        val settingsHelper = SettingsHelper.getInstance(context.applicationContext)
 
-        // Xoa bo han che uninstall app khi cap nhat config
-
-//        // Work around a strange bug with stale SettingsHelper instance: re-read its value
-//        settingsHelper = SettingsHelper.getInstance(context.applicationContext)
-//
-//        if (settingsHelper!!.getConfig() != null && settingsHelper!!.getConfig()
-//                .getRestrictions() != null
-//        ) {
-//            Utils.releaseUserRestrictions(context, settingsHelper!!.getConfig().getRestrictions())
-//            // Explicitly release restrictions of installing/uninstalling apps
-//            Utils.releaseUserRestrictions(context, "no_install_apps,no_uninstall_apps")
-//        }
+        if (settingsHelper.getConfig() != null && settingsHelper.getConfig()!!.restrictions != null) {
+            Utils.releaseUserRestrictions(context, settingsHelper.getConfig()!!.restrictions!!)
+            // Explicitly release restrictions of installing/uninstalling apps
+            Utils.releaseUserRestrictions(
+                context,
+                "${UserManager.DISALLOW_INSTALL_APPS},${UserManager.DISALLOW_UNINSTALL_APPS}"
+            )
+        }
 
         uiNotifier?.onConfigUpdateStart()
         ConfigurationRepository.getServerConfig(object : Callback<ServerConfigResponse> {
@@ -197,11 +193,12 @@ class ConfigUpdater {
                         checkAndInstallApplications(config)
                         checkApplicationsForRun(config)
                         setDefaultLauncher(context, config)
+                        lockRestrictions(config)
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
                             configInitializing = false
                             // save config to share pref
-                            SettingsHelper.getInstance(context).updateConfig(config)
+                            settingsHelper.updateConfig(config)
                             uiNotifier?.onConfigUpdateComplete()
                         }
                     }
@@ -209,8 +206,13 @@ class ConfigUpdater {
             }
 
             override fun onFailure(call: Call<ServerConfigResponse>, t: Throwable) {
+                Log.e(
+                    Const.LOG_TAG,
+                    "Config update failed: ${t.message}"
+                )
                 Toast.makeText(context, "Get failed", Toast.LENGTH_SHORT).show()
                 uiNotifier?.onConfigUpdateServerError(t.message)
+                configInitializing = false
             }
         })
     }
@@ -237,7 +239,10 @@ class ConfigUpdater {
         val applications = config.applications
         for (application in applications) {
             // Check if the app is already installed and update is needed
-            if (application.url != null && !application.remove && shouldUpdateApplication(application)) {
+            if (application.url != null && !application.remove) {
+                if (isAppInstalled(context!!, application.pkg) && !shouldUpdateApplication(application)) {
+                    continue
+                }
                 withContext(Dispatchers.Main) {
                     uiNotifier?.onAppDownloading(application)
                 }
@@ -285,19 +290,47 @@ class ConfigUpdater {
         }
     }
 
-    suspend fun setDefaultLauncher(context: Context, config: ServerConfig) = withContext(Dispatchers.IO) {
-        if (Utils.isDeviceOwner(context)) {
-            val needSetLauncher =
-                (config.runDefaultLauncher == null || !config.runDefaultLauncher)
-            val defaultLauncher: String? = Utils.getDefaultLauncher(context)
-            defaultLauncher?.let {
-                if (needSetLauncher && !context.packageName.equals(defaultLauncher, ignoreCase = true)
-                ) {
-                    Utils.setDefaultLauncher(context)
-                } else if (!needSetLauncher && context.packageName.equals(defaultLauncher, ignoreCase = true)) {
-                    Utils.clearDefaultLauncher(context)
+    suspend fun setDefaultLauncher(context: Context, config: ServerConfig) =
+        withContext(Dispatchers.IO) {
+            if (Utils.isDeviceOwner(context)) {
+                val needSetLauncher =
+                    config.runDefaultLauncher != null && config.runDefaultLauncher
+                val defaultLauncher: String? = Utils.getDefaultLauncher(context)
+                defaultLauncher?.let {
+                    if (needSetLauncher && !context.packageName.equals(
+                            defaultLauncher,
+                            ignoreCase = true
+                        )
+                    ) {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                context,
+                                "Set default launcher: ${context.packageName}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        Utils.setDefaultLauncher(context)
+                    } else if (!needSetLauncher && context.packageName.equals(
+                            defaultLauncher,
+                            ignoreCase = true
+                        )
+                    ) {
+                        Utils.clearDefaultLauncher(context)
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                context,
+                                "Clear default launcher: ${context.packageName}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
                 }
             }
+        }
+
+    private fun lockRestrictions(config: ServerConfig) {
+        config.restrictions?.let {
+            Utils.lockUserRestrictions(context!!, config.restrictions)
         }
     }
 

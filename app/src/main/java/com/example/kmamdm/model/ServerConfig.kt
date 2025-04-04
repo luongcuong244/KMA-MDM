@@ -10,4 +10,5 @@ data class ServerConfig(
     @SerializedName("iconSize") val iconSize: Int = 100,
     @SerializedName("orientation") val orientation: Int = 0,
     @SerializedName("runDefaultLauncher") val runDefaultLauncher: Boolean?,
+    @SerializedName("restrictions") val restrictions: String?,
 )
