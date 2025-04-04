@@ -2,12 +2,17 @@ package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Point
 import android.graphics.drawable.Drawable
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
+import android.provider.Settings
 import android.util.Log
 import android.view.Surface
 import android.view.View
@@ -16,22 +21,31 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.RelativeLayout
+import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
+import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
 import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
+import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.pro.KioskUtils
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
+import com.example.kmamdm.ui.dialog.AdministratorModeDialog
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
+import com.example.kmamdm.ui.dialog.ManageStorageDialog
+import com.example.kmamdm.ui.dialog.OverlaySettingsDialog
+import com.example.kmamdm.ui.dialog.UnknownSourcesDialog
+import com.example.kmamdm.ui.screen.adminmoderequest.AdminModeRequestActivity
 import com.example.kmamdm.ui.screen.base.BaseActivity
 import com.example.kmamdm.utils.AppInfo
 import com.example.kmamdm.utils.Const
@@ -39,10 +53,14 @@ import com.example.kmamdm.utils.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
     OnLongClickListener, UINotifier, BaseAppListAdapter.OnAppChooseListener,
     BaseAppListAdapter.SwitchAdapterListener {
+
+    private lateinit var preferences: SharedPreferences
+
     private var exitView: ImageView? = null
     private var infoView: ImageView? = null
     private var updateView: ImageView? = null
@@ -57,11 +75,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     private val handler = Handler()
 
+    private var kioskUnlockCounter = 0
+
     override fun createViewModel() = MainViewModel::class.java
 
     override fun getContentView(): Int = R.layout.activity_main
 
-//    override fun onCreate(savedInstanceState: Bundle?) {
+    //    override fun onCreate(savedInstanceState: Bundle?) {
 //        super.onCreate(savedInstanceState)
 //        val intent = intent
 //        Log.d(
@@ -78,34 +98,301 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 //        Initializer.init(this)
 //    }
 //
-//    override fun onResume() {
-//        super.onResume()
-//        if (firstStartAfterProvisioning) {
-//            firstStartAfterProvisioning = false
-//            waitForProvisioning(10)
-//        } else {
-//            setDefaultLauncherEarly()
-//        }
-//    }
-//
-//    private fun waitForProvisioning(attempts: Int) {
-//        if (Utils.isDeviceOwner(this) || attempts <= 0) {
-//            setDefaultLauncherEarly()
-//        } else {
-//            handler.postDelayed({ waitForProvisioning(attempts - 1) }, 1000)
-//        }
-//    }
-//
-//    private fun setDefaultLauncherEarly() {
-//        checkAndStartLauncher()
-//    }
-
     override fun initView() {
-        createLauncherButtons()
+        preferences = getSharedPreferences(Const.PREFERENCES, MODE_PRIVATE)
     }
 
     override fun bindViewModel() {
-        updateConfig()
+
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (firstStartAfterProvisioning) {
+            firstStartAfterProvisioning = false
+            waitForProvisioning(10)
+        } else {
+            setDefaultLauncherEarly()
+        }
+    }
+
+    private fun waitForProvisioning(attempts: Int) {
+        if (Utils.isDeviceOwner(this) || attempts <= 0) {
+            setDefaultLauncherEarly()
+        } else {
+            handler.postDelayed({ waitForProvisioning(attempts - 1) }, 1000)
+        }
+    }
+
+    private fun setDefaultLauncherEarly() {
+        val config: ServerConfig? = SettingsHelper.getInstance(this).getConfig()
+        if (config == null && Utils.isDeviceOwner(this)) {
+            // At first start, temporarily set Headwind MDM as a default launcher
+            // to prevent the user from clicking Home to stop running Headwind MDM
+            val defaultLauncher = Utils.getDefaultLauncher(this)
+            CoroutineScope(Dispatchers.IO).launch {
+                if (!packageName.equals(defaultLauncher, ignoreCase = true)) {
+                    Utils.setDefaultLauncher(this@MainActivity)
+                }
+                withContext(Dispatchers.Main) {
+                    checkAndStartLauncher()
+                }
+            }
+            return
+        }
+        checkAndStartLauncher()
+    }
+
+    private fun checkAndStartLauncher() {
+        val unknownSourceMode = preferences.getInt(Const.PREFERENCES_UNKNOWN_SOURCES, -1)
+        if (unknownSourceMode == -1) {
+            if (checkUnknownSources()) {
+                preferences.edit().putInt(Const.PREFERENCES_UNKNOWN_SOURCES, Const.PREFERENCES_ON)
+                    .commit()
+            } else {
+                return
+            }
+        }
+
+        val administratorMode = preferences.getInt(Const.PREFERENCES_ADMINISTRATOR, -1)
+        if (administratorMode == -1) {
+            if (checkAdminMode()) {
+                preferences.edit().putInt(Const.PREFERENCES_ADMINISTRATOR, Const.PREFERENCES_ON)
+                    .commit()
+            } else {
+                return
+            }
+        }
+
+        val overlayMode = preferences.getInt(Const.PREFERENCES_OVERLAY, -1)
+        if (overlayMode == -1) {
+            if (checkAlarmWindow()) {
+                preferences.edit().putInt(Const.PREFERENCES_OVERLAY, Const.PREFERENCES_ON).commit()
+            } else {
+                return
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val manageStorageMode = preferences.getInt(Const.PREFERENCES_MANAGE_STORAGE, -1)
+            if (manageStorageMode == -1) {
+                if (checkManageStorage()) {
+                    preferences.edit()
+                        .putInt(Const.PREFERENCES_MANAGE_STORAGE, Const.PREFERENCES_ON).commit()
+                } else {
+                    return
+                }
+            }
+        }
+
+        startLauncher()
+    }
+
+    private fun checkUnknownSources(): Boolean {
+        if (!Utils.canInstallPackages(this)) {
+            val unknownSourcesDialog = UnknownSourcesDialog {
+                continueUnknownSources()
+            }
+            unknownSourcesDialog.show(supportFragmentManager, "unknown_sources")
+            return false
+        } else {
+            return true
+        }
+    }
+
+    fun continueUnknownSources() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+        } else {
+            // In Android Oreo and above, permission to install packages are set per each app
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse(
+                        "package:$packageName"
+                    )
+                )
+            )
+        }
+    }
+
+    private fun checkAdminMode(): Boolean {
+        if (!Utils.checkAdminMode(this)) {
+            val administratorModeDialog = AdministratorModeDialog(
+                onSkip = {
+                    skipAdminMode()
+                },
+                onContinue = {
+                    setAdminMode()
+                }
+            )
+            administratorModeDialog.show(supportFragmentManager, "administrator_mode")
+            return false
+        }
+        return true
+    }
+
+    private fun skipAdminMode() {
+        preferences.edit().putInt(Const.PREFERENCES_ADMINISTRATOR, Const.PREFERENCES_OFF).commit()
+        checkAndStartLauncher()
+    }
+
+    private fun setAdminMode() {
+        startActivity(Intent(this, AdminModeRequestActivity::class.java))
+    }
+
+    private fun checkAlarmWindow(): Boolean {
+        if (!Utils.canDrawOverlays(this)) {
+            val overlaySettingsDialog = OverlaySettingsDialog(
+                onSkip = {
+                    overlayWithoutPermission()
+                },
+                onContinue = {
+                    continueOverlay()
+                }
+            )
+            overlaySettingsDialog.show(supportFragmentManager, "overlay_settings")
+            return false
+        } else {
+            return true
+        }
+    }
+
+    private fun overlayWithoutPermission() {
+        preferences.edit().putInt(Const.PREFERENCES_OVERLAY, Const.PREFERENCES_OFF).commit()
+        checkAndStartLauncher()
+    }
+
+    private fun continueOverlay() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
+        )
+        try {
+            startActivityForResult(intent, 1001)
+        } catch (e: Exception) {
+            Toast.makeText(this, R.string.overlays_not_supported, Toast.LENGTH_LONG).show()
+            overlayWithoutPermission()
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    private fun checkManageStorage(): Boolean {
+        if (!Environment.isExternalStorageManager()) {
+            val manageStorageDialog = ManageStorageDialog(
+                onSkip = {
+                    storageWithoutPermission()
+                },
+                onContinue = {
+                    continueStorage()
+                }
+            )
+            manageStorageDialog.show(supportFragmentManager, "manage_storage")
+            return false
+        }
+        return true
+    }
+
+    private fun storageWithoutPermission() {
+        preferences.edit().putInt(Const.PREFERENCES_MANAGE_STORAGE, Const.PREFERENCES_OFF).commit()
+        checkAndStartLauncher()
+    }
+
+    private fun continueStorage() {
+        try {
+            val intent = Intent()
+            intent.setAction(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+            val uri = Uri.fromParts("package", this.packageName, null)
+            intent.setData(uri)
+            startActivity(intent)
+        } catch (e: java.lang.Exception) {
+            val intent = Intent()
+            intent.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+            startActivity(intent)
+        }
+    }
+
+    private fun startLauncher() {
+        createButtons()
+
+        if (configUpdater.isPendingAppInstall()) {
+            // Here we go after completing the user confirmed app installation
+            configUpdater.repeatDownloadApps()
+        } else if (!checkPermissions(true)) {
+            // Permissions are requested inside checkPermissions, so do nothing here
+            Log.i(Const.LOG_TAG, "startLauncher: requesting permissions")
+        } else if (!settingsHelper.isBaseUrlSet() && BuildConfig.REQUEST_SERVER_URL) {
+            // For common public version, here's an option to change the server
+            createAndShowServerDialog(
+                false,
+                settingsHelper.getBaseUrl(),
+                settingsHelper.getServerProject()
+            )
+        } else if (settingsHelper.getDeviceId().length() === 0) {
+            Log.d(Const.LOG_TAG, "Device ID is empty")
+            Utils.autoGrantPhonePermission(this)
+            if (!SystemUtils.autoSetDeviceId(this)) {
+                createAndShowEnterDeviceIdDialog(false, null)
+            } else {
+                // Retry after automatical setting of device ID
+                // We shouldn't get looping here because autoSetDeviceId cannot return true if deviceId.length == 0
+                startLauncher()
+            }
+        } else if (!MainActivity.configInitialized) {
+            Log.i(Const.LOG_TAG, "Updating configuration in startLauncher()")
+            var userInteraction = true
+            val integratedProvisioningFlow: Boolean = settingsHelper.isIntegratedProvisioningFlow()
+            if (integratedProvisioningFlow) {
+                // InitialSetupActivity just started and this is the first start after
+                // the admin integrated provisioning flow, we need to show the process of loading apps
+                // Notice the config is not null because it's preloaded in InitialSetupActivity
+                settingsHelper.setIntegratedProvisioningFlow(false)
+            }
+            if (settingsHelper.getConfig() != null && !integratedProvisioningFlow) {
+                // If it's not the first start, let's update in the background, show the content first!
+                showContent(settingsHelper.getConfig())
+                userInteraction = false
+            }
+            updateConfig(userInteraction)
+        } else {
+            showContent(settingsHelper.getConfig())
+        }
+    }
+
+    private fun createButtons() {
+        val config = SettingsHelper.getInstance(this).getConfig()
+        if (!packageName.equals(config?.mainApp)) {
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(
+                    this, getString(
+                        R.string.kiosk_mode_requires_overlays,
+                        getString(R.string.white_app_name)
+                    ), Toast.LENGTH_LONG
+                ).show()
+                config.setKioskMode(false)
+                SettingsHelper.getInstance(this).updateConfig(config)
+                createLauncherButtons()
+                return
+            }
+            var kioskUnlockButton: View? = null
+            if (config.isKioskExit()) {
+                kioskUnlockButton = ProUtils.createKioskUnlockButton(this)
+            }
+            kioskUnlockButton?.setOnClickListener {
+                kioskUnlockCounter++
+                if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
+                    val restoreLauncherIntent = Intent(
+                        this@MainActivity,
+                        MainActivity::class.java
+                    )
+                    restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    startActivity(restoreLauncherIntent)
+                    createAndShowEnterPasswordDialog()
+                    kioskUnlockCounter = 0
+                }
+            }
+        } else {
+            createLauncherButtons()
+        }
     }
 
     private fun createLauncherButtons() {
@@ -305,13 +592,6 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
         scheduleInstalledAppsRun()
 
-        // Run default launcher option
-        if (config.runDefaultLauncher != null && config.runDefaultLauncher && !packageName.equals(Utils.getDefaultLauncher(this)) && !Utils.isLauncherIntent(intent)
-        ) {
-            openDefaultLauncher()
-            return
-        }
-
         if (orientationLocked) {
             Utils.setOrientation(this, config)
             orientationLocked = false
@@ -329,13 +609,6 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                     return
                 } else {
                     Log.e(Const.LOG_TAG, "Kiosk mode failed, proceed with the default flow")
-                }
-            } else {
-                if (kioskApp != null && kioskApp == packageName && KioskUtils.isKioskModeRunning(this)) {
-                    // Here we go if the configuration is changed when launcher is in the kiosk mode
-                    KioskUtils.updateKioskAllowedApps(kioskApp, this, false)
-                } else {
-                    Log.e(Const.LOG_TAG, "Kiosk mode disabled: please setup the main app!")
                 }
             }
         } else {

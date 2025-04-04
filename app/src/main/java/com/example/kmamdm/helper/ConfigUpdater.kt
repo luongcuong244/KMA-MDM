@@ -293,8 +293,9 @@ class ConfigUpdater {
     suspend fun setDefaultLauncher(context: Context, config: ServerConfig) =
         withContext(Dispatchers.IO) {
             if (Utils.isDeviceOwner(context)) {
-                val needSetLauncher =
-                    config.runDefaultLauncher != null && config.runDefaultLauncher
+                // "Run default launcher" means we should not set KMA MDM as a default launcher
+                // and clear the setting if it has been already set
+                val needSetLauncher = config.runDefaultLauncher == null || !config.runDefaultLauncher
                 val defaultLauncher: String? = Utils.getDefaultLauncher(context)
                 defaultLauncher?.let {
                     if (needSetLauncher && !context.packageName.equals(

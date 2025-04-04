@@ -117,42 +117,17 @@ object Utils {
         val dpm =
             context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         try {
-            val allLaunchers = getAllLaunchers(context)
             if (activity != null) {
-                // Clear the preferred activity for all launchers except the current package. I don't really sure it's ok but it works for me :))
-                for (launcher in allLaunchers) {
-                    if (launcher.packageName == context.packageName) {
-                        continue
-                    }
-                    dpm.clearPackagePersistentPreferredActivities(
-                        adminComponentName,
-                        launcher.packageName
-                    )
-                }
                 dpm.addPersistentPreferredActivity(adminComponentName, filter, activity)
             } else {
-                dpm.clearPackagePersistentPreferredActivities(
-                    adminComponentName,
-                    context.packageName
-                )
-                // Add the preferred activity for all launchers except the current package. I don't really sure it's ok but it works for me :))
-                for (launcher in allLaunchers) {
-                    if (launcher.packageName == context.packageName) {
-                        continue
-                    }
-                    dpm.addPersistentPreferredActivity(
-                        adminComponentName,
-                        filter,
-                        ComponentName(launcher.packageName, launcher.name)
-                    )
-                }
+                dpm.clearPackagePersistentPreferredActivities(adminComponentName, context.packageName)
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun getAllLaunchers(context: Context): List<ActivityInfo> {
+    fun getLauncherByPackageName(context: Context, packageName: String): ActivityInfo? {
         val localPackageManager = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN)
         intent.addCategory(Intent.CATEGORY_HOME)
@@ -160,14 +135,13 @@ object Utils {
             intent,
             PackageManager.MATCH_DEFAULT_ONLY
         )
-        val launchers = ArrayList<ActivityInfo>()
         for (resolveInfo in resolveInfoList) {
             val activityInfo = resolveInfo.activityInfo
-            if (activityInfo != null) {
-                launchers.add(activityInfo)
+            if (activityInfo != null && activityInfo.packageName == packageName) {
+                return activityInfo
             }
         }
-        return launchers
+        return null
     }
 
     fun getDefaultLauncher(context: Context): String? {
