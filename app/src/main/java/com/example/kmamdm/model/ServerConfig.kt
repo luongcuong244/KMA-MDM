@@ -13,6 +13,6 @@ data class ServerConfig(
     @SerializedName("runDefaultLauncher") val runDefaultLauncher: Boolean?,
     @SerializedName("restrictions") val restrictions: String?,
 
-    @SerializedName("kioskMode") val kioskMode: Boolean?,
-    @SerializedName("mainApp") val mainApp: String?,
+    @SerializedName("kioskMode") var kioskMode: Boolean?,
+    @SerializedName("kioskApps") val kioskApps: List<String> = listOf(),
 )

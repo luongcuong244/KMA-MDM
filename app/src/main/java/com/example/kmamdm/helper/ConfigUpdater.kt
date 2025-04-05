@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ConditionVariable
 import android.os.UserManager
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import com.example.kmamdm.model.Application
@@ -197,6 +198,17 @@ class ConfigUpdater {
                         withContext(Dispatchers.Main) {
                             Log.d(Const.LOG_TAG, "Config updated")
                             configInitializing = false
+
+                            // check permission draw over other apps because we need to draw exit kiosk button on top of other apps
+                            if ((settingsHelper.getConfig()?.kioskApps ?: listOf()).isNotEmpty() && !Settings.canDrawOverlays(context)) {
+                                Log.d(
+                                    Const.LOG_TAG,
+                                    "Config updated: draw over other apps permission is not granted"
+                                )
+                                settingsHelper.getConfig()?.kioskMode = false
+                                settingsHelper.updateConfig(settingsHelper.getConfig())
+                            }
+
                             // save config to share pref
                             settingsHelper.updateConfig(config)
                             uiNotifier?.onConfigUpdateComplete()

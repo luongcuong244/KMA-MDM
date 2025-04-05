@@ -29,7 +29,6 @@ import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
-import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
 import com.example.kmamdm.helper.ConfigUpdater
@@ -312,55 +311,17 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     private fun startLauncher() {
-        createButtons()
-
-        if (configUpdater.isPendingAppInstall()) {
-            // Here we go after completing the user confirmed app installation
-            configUpdater.repeatDownloadApps()
-        } else if (!checkPermissions(true)) {
-            // Permissions are requested inside checkPermissions, so do nothing here
-            Log.i(Const.LOG_TAG, "startLauncher: requesting permissions")
-        } else if (!settingsHelper.isBaseUrlSet() && BuildConfig.REQUEST_SERVER_URL) {
-            // For common public version, here's an option to change the server
-            createAndShowServerDialog(
-                false,
-                settingsHelper.getBaseUrl(),
-                settingsHelper.getServerProject()
-            )
-        } else if (settingsHelper.getDeviceId().length() === 0) {
-            Log.d(Const.LOG_TAG, "Device ID is empty")
-            Utils.autoGrantPhonePermission(this)
-            if (!SystemUtils.autoSetDeviceId(this)) {
-                createAndShowEnterDeviceIdDialog(false, null)
-            } else {
-                // Retry after automatical setting of device ID
-                // We shouldn't get looping here because autoSetDeviceId cannot return true if deviceId.length == 0
-                startLauncher()
-            }
-        } else if (!MainActivity.configInitialized) {
+        if (!configInitialized) {
             Log.i(Const.LOG_TAG, "Updating configuration in startLauncher()")
-            var userInteraction = true
-            val integratedProvisioningFlow: Boolean = settingsHelper.isIntegratedProvisioningFlow()
-            if (integratedProvisioningFlow) {
-                // InitialSetupActivity just started and this is the first start after
-                // the admin integrated provisioning flow, we need to show the process of loading apps
-                // Notice the config is not null because it's preloaded in InitialSetupActivity
-                settingsHelper.setIntegratedProvisioningFlow(false)
-            }
-            if (settingsHelper.getConfig() != null && !integratedProvisioningFlow) {
-                // If it's not the first start, let's update in the background, show the content first!
-                showContent(settingsHelper.getConfig())
-                userInteraction = false
-            }
-            updateConfig(userInteraction)
+            updateConfig()
         } else {
-            showContent(settingsHelper.getConfig())
+            showContent()
         }
     }
 
     private fun createButtons() {
         val config = SettingsHelper.getInstance(this).getConfig()
-        if (!packageName.equals(config?.mainApp)) {
+        if (config?.kioskMode == true && config.kioskApps.isNotEmpty()) {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(
                     this, getString(
@@ -368,28 +329,28 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                         getString(R.string.white_app_name)
                     ), Toast.LENGTH_LONG
                 ).show()
-                config.setKioskMode(false)
+                config.kioskMode = false
                 SettingsHelper.getInstance(this).updateConfig(config)
                 createLauncherButtons()
                 return
             }
-            var kioskUnlockButton: View? = null
-            if (config.isKioskExit()) {
-                kioskUnlockButton = ProUtils.createKioskUnlockButton(this)
-            }
-            kioskUnlockButton?.setOnClickListener {
-                kioskUnlockCounter++
-                if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
-                    val restoreLauncherIntent = Intent(
-                        this@MainActivity,
-                        MainActivity::class.java
-                    )
-                    restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    startActivity(restoreLauncherIntent)
-                    createAndShowEnterPasswordDialog()
-                    kioskUnlockCounter = 0
-                }
-            }
+//            var kioskUnlockButton: View? = null
+//            if (config.isKioskExit()) {
+//                kioskUnlockButton = ProUtils.createKioskUnlockButton(this)
+//            }
+//            kioskUnlockButton?.setOnClickListener {
+//                kioskUnlockCounter++
+//                if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
+//                    val restoreLauncherIntent = Intent(
+//                        this@MainActivity,
+//                        MainActivity::class.java
+//                    )
+//                    restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+//                    startActivity(restoreLauncherIntent)
+//                    createAndShowEnterPasswordDialog()
+//                    kioskUnlockCounter = 0
+//                }
+//            }
         } else {
             createLauncherButtons()
         }
@@ -483,13 +444,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         return true
     }
 
-    private fun updateConfig() {
+    private fun updateConfig(userInteraction: Boolean = false) {
         needRedrawContentAfterReconfigure = true
         if (!orientationLocked) {
             lockOrientation()
             orientationLocked = true
         }
-        configUpdater.updateConfig(this, this, true)
+        configUpdater.updateConfig(this, this, userInteraction)
     }
 
     /* Start UINotifier */
@@ -574,6 +535,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             downloadAndInstallAppDialog?.dismiss()
             downloadAndInstallAppDialog = null
         }
+        configInitialized = true
         showContent()
     }
 
@@ -590,6 +552,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             return
         }
 
+        createButtons()
+
         scheduleInstalledAppsRun()
 
         if (orientationLocked) {
@@ -597,14 +561,11 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             orientationLocked = false
         }
 
-        if (config.kioskMode == true) {
-            val kioskApp = config.mainApp
-            if (kioskApp != null && kioskApp.trim().isNotEmpty() &&
-                // If KMA MDM itself is set as kiosk app, the kiosk mode is already turned on;
-                // So here we just proceed to drawing the content
-                (kioskApp != packageName || !KioskUtils.isKioskModeRunning(this))
-            ) {
-                if (KioskUtils.getKioskAppIntent(kioskApp, this) != null && startKiosk(kioskApp)) {
+        if (config.kioskMode == true && config.kioskApps.isNotEmpty()) {
+            if (KioskUtils.isKioskModeRunning(this)) {
+                KioskUtils.updateKioskAllowedApps(config.kioskApps, this)
+            } else {
+                if (startKiosk(config.kioskApps)) {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     return
                 } else {
@@ -615,7 +576,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             if (KioskUtils.isKioskModeRunning(this)) {
                 // Turn off kiosk and show desktop if it is turned off in the configuration
                 KioskUtils.unlockKiosk(this)
-                openDefaultLauncher()
+                // openDefaultLauncher()
             }
         }
 
@@ -687,8 +648,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
-    private fun startKiosk(kioskApp: String): Boolean {
-        return KioskUtils.startCosuKioskMode(kioskApp, this@MainActivity)
+    private fun startKiosk(kioskApps: List<String>): Boolean {
+        return KioskUtils.startCosuKioskMode(kioskApps, this@MainActivity)
     }
 
     /* Start BaseAppListAdapter.OnAppChooseListener */
@@ -752,5 +713,6 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     companion object {
         private const val PAUSE_BETWEEN_AUTORUNS_SEC = 3
+        private var configInitialized: Boolean = false
     }
 }

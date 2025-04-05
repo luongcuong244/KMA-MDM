@@ -36,15 +36,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KMAMDM"
         tools:targetApi="31">
-        <activity
-            android:name=".ui.screen.permisson.PermissionActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
+<!--        <activity-->
+<!--            android:name=".ui.screen.permisson.PermissionActivity"-->
+<!--            android:exported="true">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN" />-->
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+<!--                <category android:name="android.intent.category.LAUNCHER" />-->
+<!--            </intent-filter>-->
+<!--        </activity>-->
 
         <activity
             android:name=".ui.screen.adminmoderequest.AdminModeRequestActivity"
@@ -59,6 +59,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.app.action.PROVISIONING_SUCCESSFUL"/>
 
+                <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>

@@ -12,15 +12,14 @@ import android.os.UserManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
-import com.bumptech.glide.util.Util
 import com.example.kmamdm.extension.findActivity
 import com.example.kmamdm.helper.SettingsHelper
-import com.example.kmamdm.ui.screen.main.MainActivity
 import com.example.kmamdm.utils.LegacyUtils
 import com.example.kmamdm.utils.Utils
+import okhttp3.internal.concat
 
 object KioskUtils {
-    private var mKioskApp: String? = null
+    private var mKioskApps: List<String> = listOf()
     private var mAdminComponentName: ComponentName? = null
     private var mDevicePolicyManager: DevicePolicyManager? = null
 
@@ -28,23 +27,37 @@ object KioskUtils {
         return SettingsHelper.getInstance(context).isKioskModeRunning()
     }
 
-    fun getKioskAppIntent(kioskApp: String, activity: Activity): Intent? {
-        return activity.packageManager.getLaunchIntentForPackage(kioskApp)
+    fun updateKioskAllowedApps(kioskApps: List<String>, activity: Activity) {
+        // Nếu mKioskApps.size = 1 -> package đầu tiên là launcher
+        // Nếu mKioskApps.size > 1 -> mdm app là launcher
+        if (mKioskApps.size == 1) {
+            // clear package persistent preferred activities
+            setAsHomeApp(activity, false)
+        }
+        mKioskApps = kioskApps
+        // set package persistent preferred activities
+        setAsHomeApp(activity, true)
+
+        val isAdmin = Utils.checkAdminMode(activity)
+        setLockTask(activity, true, isAdmin)
     }
 
     // Start COSU kiosk mode
-    fun startCosuKioskMode(kioskApp: String, activity: Activity): Boolean {
-        mKioskApp = kioskApp
+    fun startCosuKioskMode(kioskApps: List<String>, activity: Activity): Boolean {
+        mKioskApps = kioskApps
         mAdminComponentName = LegacyUtils.getAdminComponentName(activity)
         mDevicePolicyManager = activity.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        
+
         SettingsHelper.getInstance(activity).setKioskModeRunning(true)
         setKioskPolicies(activity, true)
-        Toast.makeText(activity, "Kiosk mode started with $kioskApp", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "Kiosk mode started with $kioskApps", Toast.LENGTH_SHORT).show()
         return true
     }
 
     fun unlockKiosk(activity: Activity) {
+        mAdminComponentName = LegacyUtils.getAdminComponentName(activity)
+        mDevicePolicyManager = activity.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+
         SettingsHelper.getInstance(activity).setKioskModeRunning(false)
         setKioskPolicies(activity, false)
         Toast.makeText(activity, "Kiosk mode stopped", Toast.LENGTH_SHORT).show()
@@ -94,9 +107,20 @@ object KioskUtils {
 
     private fun setLockTask(context: Context, start: Boolean, isAdmin: Boolean) {
         if (isAdmin) {
-            mDevicePolicyManager!!.setLockTaskPackages(
-                mAdminComponentName!!, if (start) arrayOf(mKioskApp) else arrayOf()
-            )
+            var lockTaskPackages = arrayOf<String>()
+            if (start) {
+                lockTaskPackages = if (mKioskApps.size == 1) {
+                    if (shouldSetAsHomeApp(context)) {
+                        arrayOf(mKioskApps[0])
+                    } else {
+                        arrayOf(mKioskApps[0], context.packageName)
+                    }
+                } else {
+                    // add the package name of the current app to the list of lock task packages for managing multiple apps
+                    mKioskApps.toTypedArray().concat(context.packageName)
+                }
+            }
+            mDevicePolicyManager!!.setLockTaskPackages(mAdminComponentName!!, lockTaskPackages)
         }
         context.findActivity()?.let {
             if (start) {
@@ -122,16 +146,27 @@ object KioskUtils {
         val filter = IntentFilter(Intent.ACTION_MAIN)
         filter.addCategory(Intent.CATEGORY_HOME)
         filter.addCategory(Intent.CATEGORY_DEFAULT)
-        if (enable) {
-            val activityInfo = Utils.getLauncherByPackageName(context, mKioskApp!!)
+        if (enable && shouldSetAsHomeApp(context)) {
+            val activityInfo = Utils.getLauncherByPackageName(context, mKioskApps.first())
             activityInfo?.let {
                 val activity = ComponentName(it.packageName, it.name)
                 mDevicePolicyManager!!.addPersistentPreferredActivity(mAdminComponentName, filter, activity)
             }
         } else {
-            mDevicePolicyManager!!.clearPackagePersistentPreferredActivities(mAdminComponentName, mKioskApp)
+            mDevicePolicyManager!!.clearPackagePersistentPreferredActivities(mAdminComponentName, mKioskApps.first())
             Utils.setDefaultLauncher(context)
         }
+    }
+
+    private fun shouldSetAsHomeApp(context: Context): Boolean {
+        if (mKioskApps.size != 1) {
+            return false
+        }
+        val filter = IntentFilter(Intent.ACTION_MAIN)
+        filter.addCategory(Intent.CATEGORY_HOME)
+        filter.addCategory(Intent.CATEGORY_DEFAULT)
+        val activityInfo = Utils.getLauncherByPackageName(context, mKioskApps.first())
+        return activityInfo != null
     }
 
     private fun setKeyGuardEnabled(enable: Boolean) {

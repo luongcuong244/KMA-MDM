@@ -22,14 +22,14 @@
 
     <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#ffffff"
         android:gravity="center"
         android:orientation="vertical"
         android:paddingLeft="@dimen/activity_horizontal_margin"
         android:paddingTop="@dimen/activity_vertical_margin"
         android:paddingRight="@dimen/activity_horizontal_margin"
         android:paddingBottom="@dimen/activity_vertical_margin"
-        android:background="#ffffff"
         tools:context="com.hmdm.launcher.ui.MainActivity">
 
         <TextView
@@ -37,31 +37,51 @@
             android:layout_width="@dimen/dialog_enter_device_id_width"
             android:layout_height="wrap_content"
             android:layout_marginBottom="@dimen/activity_horizontal_margin"
-            android:text="@string/dialog_manage_storage_title" />
+            android:text="@string/dialog_manage_storage_title"
+            android:textColor="#5F5F5F" />
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="36dp"
             android:gravity="center"
             android:orientation="horizontal">
 
-            <Button
+            <RelativeLayout
                 android:id="@+id/btn_skip"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="8dp"
-                android:layout_weight="1"
-                android:text="@string/dialog_history_settings_skip"
-                android:textSize="@dimen/button_text_size" />
-
-            <Button
-                android:id="@+id/btn_continue"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginLeft="8dp"
                 android:layout_weight="1"
-                android:text="@string/dialog_history_settings_continue"
-                android:textSize="@dimen/button_text_size" />
+                android:background="@drawable/dialog_nagative_button">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="@string/dialog_history_settings_skip"
+                    android:textColor="#000000"
+                    android:textSize="@dimen/button_text_size" />
+
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:id="@+id/btn_continue"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/dialog_positive_button">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="@string/dialog_history_settings_continue"
+                    android:textColor="#ffffff"
+                    android:textSize="@dimen/button_text_size" />
+
+            </RelativeLayout>
 
         </LinearLayout>
 
