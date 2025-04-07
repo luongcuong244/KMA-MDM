@@ -118,12 +118,29 @@ object Utils {
             context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         try {
             if (activity != null) {
+                clearAllLaunchers(context, dpm, adminComponentName)
                 dpm.addPersistentPreferredActivity(adminComponentName, filter, activity)
             } else {
                 dpm.clearPackagePersistentPreferredActivities(adminComponentName, context.packageName)
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
+        }
+    }
+
+    fun clearAllLaunchers(context: Context, devicePolicyManager: DevicePolicyManager, adminComponentName: ComponentName) {
+        val localPackageManager = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN)
+        intent.addCategory(Intent.CATEGORY_HOME)
+        val resolveInfoList = localPackageManager.queryIntentActivities(
+            intent,
+            PackageManager.MATCH_DEFAULT_ONLY
+        )
+        for (resolveInfo in resolveInfoList) {
+            val activityInfo = resolveInfo.activityInfo
+            activityInfo?.let {
+                devicePolicyManager.clearPackagePersistentPreferredActivities(adminComponentName, it.packageName)
+            }
         }
     }
 

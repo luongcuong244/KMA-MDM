@@ -334,23 +334,20 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                 createLauncherButtons()
                 return
             }
-//            var kioskUnlockButton: View? = null
-//            if (config.isKioskExit()) {
-//                kioskUnlockButton = ProUtils.createKioskUnlockButton(this)
-//            }
-//            kioskUnlockButton?.setOnClickListener {
-//                kioskUnlockCounter++
-//                if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
-//                    val restoreLauncherIntent = Intent(
-//                        this@MainActivity,
-//                        MainActivity::class.java
-//                    )
-//                    restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-//                    startActivity(restoreLauncherIntent)
-//                    createAndShowEnterPasswordDialog()
-//                    kioskUnlockCounter = 0
-//                }
-//            }
+            var kioskUnlockButton: View? = null
+            kioskUnlockButton?.setOnClickListener {
+                kioskUnlockCounter++
+                if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
+                    val restoreLauncherIntent = Intent(
+                        this@MainActivity,
+                        MainActivity::class.java
+                    )
+                    restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    startActivity(restoreLauncherIntent)
+                    createAndShowEnterPasswordDialog()
+                    kioskUnlockCounter = 0
+                }
+            }
         } else {
             createLauncherButtons()
         }

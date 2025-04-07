@@ -28,6 +28,7 @@ object KioskUtils {
     }
 
     fun updateKioskAllowedApps(kioskApps: List<String>, activity: Activity) {
+        // check equals kioskApps
         // Nếu mKioskApps.size = 1 -> package đầu tiên là launcher
         // Nếu mKioskApps.size > 1 -> mdm app là launcher
         if (mKioskApps.size == 1) {
@@ -149,6 +150,7 @@ object KioskUtils {
         if (enable && shouldSetAsHomeApp(context)) {
             val activityInfo = Utils.getLauncherByPackageName(context, mKioskApps.first())
             activityInfo?.let {
+                Utils.clearAllLaunchers(context, mDevicePolicyManager!!, mAdminComponentName!!)
                 val activity = ComponentName(it.packageName, it.name)
                 mDevicePolicyManager!!.addPersistentPreferredActivity(mAdminComponentName, filter, activity)
             }
