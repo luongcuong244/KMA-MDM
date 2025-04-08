@@ -1,7 +1,9 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -10,8 +12,10 @@ import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
+import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
 import android.view.Surface
@@ -37,6 +41,8 @@ import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.pro.KioskUtils
+import com.example.kmamdm.service.FloatingButtonService
+import com.example.kmamdm.service.FloatingButtonService.LocalBinder
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.AdministratorModeDialog
@@ -53,6 +59,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
     OnLongClickListener, UINotifier, BaseAppListAdapter.OnAppChooseListener,
@@ -76,27 +83,74 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     private var kioskUnlockCounter = 0
 
+    private var floatingButtonService: FloatingButtonService? = null
+    private var isBound = false
+
+    private val serviceConnection: ServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            val binder = service as LocalBinder
+            floatingButtonService = binder.service
+            isBound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            isBound = false
+        }
+    }
+
+    private fun startAndBindService(listener: View.OnClickListener) {
+        if (!isBound) {
+            val intent = Intent(this, FloatingButtonService::class.java)
+            startService(intent)
+            bindService(intent, serviceConnection, BIND_AUTO_CREATE)
+        } else {
+            floatingButtonService?.showFloatingButton()
+        }
+        setFloatingButtonOnClickListener(listener)
+    }
+
+    private fun setFloatingButtonOnClickListener(listener: View.OnClickListener, attempts: Int = 0) {
+        handler.postDelayed({
+            if (isBound) {
+                floatingButtonService?.setFloatingButtonOnClickListener(listener)
+            } else {
+                if (attempts >= 6) {
+                    Log.e(Const.LOG_TAG, "Failed to bind FloatingButtonService after 5 attempts")
+                    return@postDelayed
+                }
+                setFloatingButtonOnClickListener(listener, attempts + 1)
+            }
+        }, 500)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isBound) {
+            unbindService(serviceConnection)
+            isBound = false
+        }
+    }
+
     override fun createViewModel() = MainViewModel::class.java
 
     override fun getContentView(): Int = R.layout.activity_main
 
-    //    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//        val intent = intent
-//        Log.d(
-//            Const.LOG_TAG,
-//            "MainActivity started" + (if (intent != null && intent.action != null) ", action: " + intent.action else "")
-//        )
-//        if (intent != null && "android.app.action.PROVISIONING_SUCCESSFUL".equals(
-//                intent.action,
-//                ignoreCase = true
-//            )
-//        ) {
-//            firstStartAfterProvisioning = true
-//        }
-//        Initializer.init(this)
-//    }
-//
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val intent = intent
+        Log.d(
+            Const.LOG_TAG,
+            "MainActivity started" + (if (intent != null && intent.action != null) ", action: " + intent.action else "")
+        )
+        if (intent != null && "android.app.action.PROVISIONING_SUCCESSFUL".equals(
+                intent.action,
+                ignoreCase = true
+            )
+        ) {
+            firstStartAfterProvisioning = true
+        }
+    }
+
     override fun initView() {
         preferences = getSharedPreferences(Const.PREFERENCES, MODE_PRIVATE)
     }
@@ -334,17 +388,20 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                 createLauncherButtons()
                 return
             }
-            var kioskUnlockButton: View? = null
-            kioskUnlockButton?.setOnClickListener {
+            startAndBindService {
                 kioskUnlockCounter++
                 if (kioskUnlockCounter >= Const.KIOSK_UNLOCK_CLICK_COUNT) {
+                    floatingButtonService?.closeFloatingButton()
                     val restoreLauncherIntent = Intent(
                         this@MainActivity,
                         MainActivity::class.java
                     )
                     restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     startActivity(restoreLauncherIntent)
-                    createAndShowEnterPasswordDialog()
+                    // createAndShowEnterPasswordDialog()
+                    if (KioskUtils.isKioskModeRunning(this)) {
+                        KioskUtils.unlockKiosk(this)
+                    }
                     kioskUnlockCounter = 0
                 }
             }
@@ -591,7 +648,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         }
 
         if (mainAppListAdapter == null || needRedrawContentAfterReconfigure) {
-            if (config?.backgroundImageUrl != null && config.backgroundImageUrl.isNotEmpty()) {
+            if (!config.backgroundImageUrl.isNullOrEmpty()) {
                 mDataBinding.activityMainBackground.visibility = View.VISIBLE
                 Glide.with(this)
                     .load(config.backgroundImageUrl)

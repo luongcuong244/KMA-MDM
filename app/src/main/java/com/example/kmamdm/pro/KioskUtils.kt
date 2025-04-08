@@ -60,6 +60,10 @@ object KioskUtils {
         mDevicePolicyManager = activity.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
 
         SettingsHelper.getInstance(activity).setKioskModeRunning(false)
+        val config = SettingsHelper.getInstance(activity).getConfig()
+        config?.kioskMode = false
+        SettingsHelper.getInstance(activity).updateConfig(config)
+
         setKioskPolicies(activity, false)
         Toast.makeText(activity, "Kiosk mode stopped", Toast.LENGTH_SHORT).show()
     }

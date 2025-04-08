@@ -158,7 +158,7 @@ object Const {
     val QR_WORK_PROFILE_ATTR: String = "com.hmdm.WORK_PROFILE"
 
     
-    const val KIOSK_UNLOCK_CLICK_COUNT: Int = 4
+    const val KIOSK_UNLOCK_CLICK_COUNT: Int = 1
 
     
     val INTENT_PUSH_NOTIFICATION_PREFIX: String = "com.hmdm.push."
