@@ -94,6 +94,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <provider
+            android:name=".provider.AppSettingContentProvider"
+            android:authorities="${applicationId}.appsettingprovider"
+            android:enabled="true"
+            android:exported="true" />
     </application>
 
 </manifest>

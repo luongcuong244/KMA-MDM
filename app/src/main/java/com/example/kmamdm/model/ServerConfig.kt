@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 data class ServerConfig(
     @SerializedName("allowedApplications") val applications: List<Application>,
+    @SerializedName("applicationSettings") val applicationSettings: List<ApplicationSetting> = listOf(),
 
     @SerializedName("backgroundColor") val backgroundColor: String?,
     @SerializedName("backgroundImageUrl") val backgroundImageUrl: String?,

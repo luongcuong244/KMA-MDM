@@ -2,12 +2,14 @@ package com.example.kmamdm.helper
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.kmamdm.model.ApplicationSetting
 import com.example.kmamdm.model.ServerConfig
 import com.google.gson.Gson
 
 class SettingsHelper(context: Context) {
     private var sharedPreferences: SharedPreferences
     private var config: ServerConfig? = null
+    private val appSettings: Map<String, ApplicationSetting> = HashMap<String, ApplicationSetting>()
 
     init {
         PACKAGE_NAME = context.packageName
