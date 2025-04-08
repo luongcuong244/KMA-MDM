@@ -630,7 +630,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             if (KioskUtils.isKioskModeRunning(this)) {
                 // Turn off kiosk and show desktop if it is turned off in the configuration
                 KioskUtils.unlockKiosk(this)
-                // openDefaultLauncher()
+                // close floating button if needed
+                floatingButtonService?.closeFloatingButton()
             }
         }
 

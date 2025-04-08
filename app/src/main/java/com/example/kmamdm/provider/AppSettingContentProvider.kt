@@ -43,12 +43,13 @@ class AppSettingContentProvider : ContentProvider() {
 
         Log.d(Const.LOG_TAG, "Query from package: $callingPackage")
 
-//        for (appSetting in applicationSettings) {
-//            if (appSetting.packageId == callingPackage || callingPackage == "unknown") {
-//                cursor.addRow(arrayOf<Any?>(appSetting.attribute, appSetting.value, appSetting.comment))
-//            }
-//        }
-        cursor.addRow(arrayOf<Any?>("url", "https://pub.dev/packages/auto_size_text/install", null))
+        for (appSetting in applicationSettings) {
+            Log.d(Const.LOG_TAG, "AppSetting: ${appSetting.application.pkg} - ${appSetting.attribute} - ${appSetting.value} - ${appSetting.comment}")
+            if (appSetting.application.pkg == callingPackage || callingPackage == "unknown") {
+                Log.d(Const.LOG_TAG, "Adding to cursor: ${appSetting.attribute} - ${appSetting.value} - ${appSetting.comment}")
+                cursor.addRow(arrayOf<Any?>(appSetting.attribute, appSetting.value, appSetting.comment))
+            }
+        }
 
         return cursor
     }

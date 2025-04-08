@@ -2,6 +2,7 @@ package com.example.kmamdm.utils
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -15,6 +16,7 @@ import android.provider.Settings.SettingNotFoundException
 import android.util.Log
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.screen.main.MainActivity
+
 
 object Utils {
     // use this command to set the device owner     ->      adb shell dpm set-device-owner com.example.kmamdm/.AdminReceiver
@@ -76,19 +78,6 @@ object Utils {
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         Log.i(Const.LOG_TAG, "Set orientation: $loggedOrientation")
-    }
-
-    fun isLauncherIntent(intent: Intent?): Boolean {
-        if (intent == null) {
-            return false
-        }
-        val categories = intent.categories ?: return false
-        for (c in categories) {
-            if (c == Intent.CATEGORY_LAUNCHER) {
-                return true
-            }
-        }
-        return false
     }
 
     fun setDefaultLauncher(context: Context) {
