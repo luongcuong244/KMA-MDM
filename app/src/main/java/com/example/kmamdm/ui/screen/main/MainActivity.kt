@@ -137,7 +137,6 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val intent = intent
         Log.d(
             Const.LOG_TAG,
             "MainActivity started" + (if (intent != null && intent.action != null) ", action: " + intent.action else "")

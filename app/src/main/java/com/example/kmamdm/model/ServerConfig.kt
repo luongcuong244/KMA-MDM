@@ -3,7 +3,7 @@ package com.example.kmamdm.model
 import com.google.gson.annotations.SerializedName
 
 data class ServerConfig(
-    @SerializedName("allowedApplications") val applications: List<Application>,
+    @SerializedName("applications") val applications: List<ApplicationConfig>,
     @SerializedName("applicationSettings") val applicationSettings: List<ApplicationSetting> = listOf(),
 
     @SerializedName("backgroundColor") val backgroundColor: String?,

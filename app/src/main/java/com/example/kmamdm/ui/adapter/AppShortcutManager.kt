@@ -2,13 +2,13 @@ package com.example.kmamdm.ui.adapter
 
 import android.content.Context
 import com.example.kmamdm.helper.SettingsHelper
-import com.example.kmamdm.model.Application
+import com.example.kmamdm.model.ApplicationConfig
 import com.example.kmamdm.utils.AppInfo
 import java.util.Collections
 
 class AppShortcutManager {
     fun getInstalledAppCount(context: Context, bottom: Boolean): Int {
-        val requiredPackages = mutableMapOf<String, Application>()
+        val requiredPackages = mutableMapOf<String, ApplicationConfig>()
         getConfiguredApps(context, requiredPackages)
         val packs = context.packageManager.getInstalledApplications(0)
         // Calculate applications
@@ -25,7 +25,7 @@ class AppShortcutManager {
     }
 
     fun getInstalledApps(context: Context, bottom: Boolean): List<AppInfo> {
-        val requiredPackages = mutableMapOf<String, Application>()
+        val requiredPackages = mutableMapOf<String, ApplicationConfig>()
         getConfiguredApps(context, requiredPackages)
 
         val appInfos = mutableListOf<AppInfo>()
@@ -42,10 +42,10 @@ class AppShortcutManager {
                 val app = requiredPackages[p.packageName]
                 val newInfo = AppInfo()
                 newInfo.name =
-                    if (app?.iconText != null) app.iconText else p.loadLabel(context.packageManager)
+                    if (app?.application?.iconText != null) app.application.iconText else p.loadLabel(context.packageManager)
                         .toString()
                 newInfo.packageName = p.packageName
-                newInfo.iconUrl = app?.iconUrl
+                newInfo.iconUrl = app?.application?.icon?.fullUrl
                 newInfo.screenOrder = app?.screenOrder
                 appInfos.add(newInfo)
             }
@@ -59,15 +59,15 @@ class AppShortcutManager {
 
     private fun getConfiguredApps(
         context: Context,
-        requiredPackages: MutableMap<String, Application>,
+        requiredPackages: MutableMap<String, ApplicationConfig>,
     ) {
         val config: SettingsHelper = SettingsHelper.getInstance(context)
         if (config.getConfig() != null) {
-            val applications: List<Application> =
+            val applications: List<ApplicationConfig> =
                 SettingsHelper.getInstance(context).getConfig()!!.applications
-            for (application in applications) {
-                if (application.showIcon && !application.remove) {
-                    requiredPackages[application.pkg] = application
+            for (applicationConfig in applications) {
+                if (applicationConfig.showIcon && !applicationConfig.remove) {
+                    requiredPackages[applicationConfig.application.pkg] = applicationConfig
                 }
             }
         }

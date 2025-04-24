@@ -14,6 +14,7 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import com.example.kmamdm.model.Application
+import com.example.kmamdm.model.ApplicationConfig
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
@@ -214,6 +215,14 @@ class ConfigUpdater {
                             uiNotifier?.onConfigUpdateComplete()
                         }
                     }
+                } else {
+                    Log.e(
+                        Const.LOG_TAG,
+                        "Config update failed: ${response.errorBody()?.string()}"
+                    )
+                    Toast.makeText(context, "Get failed", Toast.LENGTH_SHORT).show()
+                    uiNotifier?.onConfigUpdateServerError(response.errorBody()?.string())
+                    configInitializing = false
                 }
             }
 
@@ -231,9 +240,10 @@ class ConfigUpdater {
 
     suspend fun checkAndUninstallApplication(config: ServerConfig) = withContext(Dispatchers.IO) {
         val applications = config.applications
-        for (application in applications) {
+        for (applicationConfig in applications) {
             // if the url is null -> system app -> do not uninstall
-            if (application.url != null && application.remove) {
+            val application = applicationConfig.application
+            if (applicationConfig.version.fullUrl != null && applicationConfig.remove) {
                 if (isAppInstalled(context!!, application.pkg)) {
                     withContext(Dispatchers.Main) {
                         uiNotifier?.onAppRemoving(application)
@@ -249,10 +259,11 @@ class ConfigUpdater {
 
     suspend fun checkAndInstallApplications(config: ServerConfig) = withContext(Dispatchers.IO) {
         val applications = config.applications
-        for (application in applications) {
+        for (applicationConfig in applications) {
             // Check if the app is already installed and update is needed
-            if (application.url != null && !application.remove) {
-                if (isAppInstalled(context!!, application.pkg) && !shouldUpdateApplication(application)) {
+            val application = applicationConfig.application
+            if (applicationConfig.version.fullUrl != null && !applicationConfig.remove) {
+                if (isAppInstalled(context!!, application.pkg) && !shouldUpdateApplication(applicationConfig)) {
                     continue
                 }
                 withContext(Dispatchers.Main) {
@@ -260,7 +271,7 @@ class ConfigUpdater {
                 }
                 val downloadedFile = InstallUtils.downloadFile(
                     context!!,
-                    application.url,
+                    applicationConfig.version.fullUrl!!,
                     object : InstallUtils.DownloadProgress {
                         override fun onDownloadProgress(progress: Int, total: Long, current: Long) {
                             uiNotifier?.onDownloadProgress(progress, total, current)
@@ -295,9 +306,9 @@ class ConfigUpdater {
     suspend fun checkApplicationsForRun(config: ServerConfig) = withContext(Dispatchers.IO) {
         applicationsForRun.clear()
         val applications = config.applications
-        for (application in applications) {
-            if (application.runAfterInstall) {
-                applicationsForRun.add(application)
+        for (applicationConfig in applications) {
+            if (applicationConfig.runAfterInstall) {
+                applicationsForRun.add(applicationConfig.application)
             }
         }
     }
@@ -347,15 +358,15 @@ class ConfigUpdater {
         }
     }
 
-    private fun shouldUpdateApplication(application: Application): Boolean {
+    private fun shouldUpdateApplication(application: ApplicationConfig): Boolean {
         val oldConfig = SettingsHelper.getInstance(context!!).getConfig()
         val oldConfigApplications = oldConfig?.applications ?: emptyList()
-        val oldApplication = oldConfigApplications.find { it.pkg == application.pkg && !it.remove }
+        val oldApplication = oldConfigApplications.find { it.application.pkg == application.application.pkg && !it.remove }
         return oldApplication == null || !InstallUtils.areVersionsEqual(
-            application.versionName,
-            application.versionCode,
-            oldApplication.versionName,
-            oldApplication.versionCode
+            application.version.versionName,
+            application.version.versionCode,
+            oldApplication.version.versionName,
+            oldApplication.version.versionCode
         )
     }
 
