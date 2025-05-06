@@ -10,11 +10,19 @@ import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.example.kmamdm.ui.dialog.EnterDeviceIdDialog
+import com.example.kmamdm.ui.dialog.NetworkErrorDialog
+import com.example.kmamdm.ui.screen.error_details.ErrorDetailsActivity
 
 abstract class BaseActivity<VM : ViewModel, DB : ViewDataBinding> : AppCompatActivity() {
     lateinit var mViewModel: VM
     lateinit var mDataBinding: DB
     private var currentApiVersion = 0
+
+    protected var enterDeviceIdDialog: EnterDeviceIdDialog? = null
+    protected var networkErrorDetails: String? = null
+
+    protected var networkErrorDialog: NetworkErrorDialog? = null
 
     abstract fun createViewModel(): Class<VM>
     abstract fun getContentView(): Int
@@ -60,5 +68,9 @@ abstract class BaseActivity<VM : ViewModel, DB : ViewDataBinding> : AppCompatAct
 
     private fun startActivityWithDefaultRequestCode(intent: Intent) {
         startActivityForResult(intent, 1000)
+    }
+
+    fun showErrorDetails() {
+        ErrorDetailsActivity.display(this, networkErrorDetails, false)
     }
 }

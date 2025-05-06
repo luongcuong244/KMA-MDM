@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -50,6 +52,10 @@
         <activity
             android:name=".ui.screen.adminmoderequest.AdminModeRequestActivity"
             android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.screen.error_details.ErrorDetailsActivity"
             android:exported="false" />
 
         <activity

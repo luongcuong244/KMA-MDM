@@ -13,12 +13,14 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ApplicationConfig
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
 import com.example.kmamdm.utils.Const
+import com.example.kmamdm.utils.DeviceUtils
 import com.example.kmamdm.utils.InstallUtils
 import com.example.kmamdm.utils.Utils
 import kotlinx.coroutines.CoroutineScope
@@ -181,61 +183,77 @@ class ConfigUpdater {
         }
 
         uiNotifier?.onConfigUpdateStart()
-        ConfigurationRepository.getServerConfig(object : Callback<ServerConfigResponse> {
-            override fun onResponse(
-                call: Call<ServerConfigResponse>,
-                response: Response<ServerConfigResponse>
-            ) {
-                if (response.isSuccessful && response.body() != null) {
-                    val config = response.body()!!.data
-                    registerAppInstallReceiver()
 
-                    CoroutineScope(Dispatchers.IO).launch {
-                        checkAndUninstallApplication(config)
-                        checkAndInstallApplications(config)
-                        checkApplicationsForRun(config)
-                        setDefaultLauncher(context, config)
-                        lockRestrictions(config)
-                        withContext(Dispatchers.Main) {
-                            Log.d(Const.LOG_TAG, "Config updated")
-                            configInitializing = false
+        val deviceId = settingsHelper.getDeviceId()
+        var signature = ""
+        try {
+            signature = CryptoHelper.getSHA1String(BuildConfig.REQUEST_SIGNATURE + deviceId)
+        } catch (e: java.lang.Exception) {
+        }
 
-                            // check permission draw over other apps because we need to draw exit kiosk button on top of other apps
-                            if ((settingsHelper.getConfig()?.kioskApps ?: listOf()).isNotEmpty() && !Settings.canDrawOverlays(context)) {
-                                Log.d(
-                                    Const.LOG_TAG,
-                                    "Config updated: draw over other apps permission is not granted"
-                                )
-                                settingsHelper.getConfig()?.kioskMode = false
-                                settingsHelper.updateConfig(settingsHelper.getConfig())
+        val deviceInfo = DeviceUtils.getDeviceInfo(context)
+
+        ConfigurationRepository.getServerConfig(
+            signature,
+            deviceInfo,
+            object : Callback<ServerConfigResponse> {
+                override fun onResponse(
+                    call: Call<ServerConfigResponse>,
+                    response: Response<ServerConfigResponse>
+                ) {
+                    if (response.isSuccessful && response.body() != null) {
+                        val config = response.body()!!.data
+                        registerAppInstallReceiver()
+
+                        CoroutineScope(Dispatchers.IO).launch {
+                            checkAndUninstallApplication(config)
+                            checkAndInstallApplications(config)
+                            checkApplicationsForRun(config)
+                            setDefaultLauncher(context, config)
+                            lockRestrictions(config)
+                            withContext(Dispatchers.Main) {
+                                Log.d(Const.LOG_TAG, "Config updated")
+                                configInitializing = false
+
+                                // check permission draw over other apps because we need to draw exit kiosk button on top of other apps
+                                if ((settingsHelper.getConfig()?.kioskApps
+                                        ?: listOf()).isNotEmpty() && !Settings.canDrawOverlays(
+                                        context
+                                    )
+                                ) {
+                                    Log.d(
+                                        Const.LOG_TAG,
+                                        "Config updated: draw over other apps permission is not granted"
+                                    )
+                                    settingsHelper.getConfig()?.kioskMode = false
+                                    settingsHelper.updateConfig(settingsHelper.getConfig())
+                                }
+
+                                // save config to share pref
+                                settingsHelper.updateConfig(config)
+                                uiNotifier?.onConfigUpdateComplete()
                             }
-
-                            // save config to share pref
-                            settingsHelper.updateConfig(config)
-                            uiNotifier?.onConfigUpdateComplete()
                         }
+                    } else {
+                        Log.e(
+                            Const.LOG_TAG,
+                            "Config update failed: ${response.errorBody()?.string()}"
+                        )
+                        uiNotifier?.onConfigUpdateServerError(response.errorBody()?.string())
+                        configInitializing = false
                     }
-                } else {
+                }
+
+                override fun onFailure(call: Call<ServerConfigResponse>, t: Throwable) {
                     Log.e(
                         Const.LOG_TAG,
-                        "Config update failed: ${response.errorBody()?.string()}"
+                        "Config update failed: ${t.message}"
                     )
-                    Toast.makeText(context, "Get failed", Toast.LENGTH_SHORT).show()
-                    uiNotifier?.onConfigUpdateServerError(response.errorBody()?.string())
+                    uiNotifier?.onConfigUpdateNetworkError(t.message)
                     configInitializing = false
                 }
-            }
-
-            override fun onFailure(call: Call<ServerConfigResponse>, t: Throwable) {
-                Log.e(
-                    Const.LOG_TAG,
-                    "Config update failed: ${t.message}"
-                )
-                Toast.makeText(context, "Get failed", Toast.LENGTH_SHORT).show()
-                uiNotifier?.onConfigUpdateServerError(t.message)
-                configInitializing = false
-            }
-        })
+            },
+        )
     }
 
     suspend fun checkAndUninstallApplication(config: ServerConfig) = withContext(Dispatchers.IO) {
@@ -258,12 +276,23 @@ class ConfigUpdater {
     }
 
     suspend fun checkAndInstallApplications(config: ServerConfig) = withContext(Dispatchers.IO) {
+        val isGoodTimeForAppUpdate = userInteraction
+        val isGoodNetworkForUpdate = userInteraction
+
+        if (!isGoodTimeForAppUpdate || !isGoodNetworkForUpdate) {
+            Log.d(Const.LOG_TAG, "Not good time for app update")
+            return@withContext
+        }
+
         val applications = config.applications
         for (applicationConfig in applications) {
             // Check if the app is already installed and update is needed
             val application = applicationConfig.application
             if (applicationConfig.version.fullUrl != null && !applicationConfig.remove) {
-                if (isAppInstalled(context!!, application.pkg) && !shouldUpdateApplication(applicationConfig)) {
+                if (isAppInstalled(context!!, application.pkg) && !shouldUpdateApplication(
+                        applicationConfig
+                    )
+                ) {
                     continue
                 }
                 withContext(Dispatchers.Main) {
@@ -318,7 +347,8 @@ class ConfigUpdater {
             if (Utils.isDeviceOwner(context)) {
                 // "Run default launcher" means we should not set KMA MDM as a default launcher
                 // and clear the setting if it has been already set
-                val needSetLauncher = config.runDefaultLauncher == null || !config.runDefaultLauncher
+                val needSetLauncher =
+                    config.runDefaultLauncher == null || !config.runDefaultLauncher
                 val defaultLauncher: String? = Utils.getDefaultLauncher(context)
                 defaultLauncher?.let {
                     if (needSetLauncher && !context.packageName.equals(
@@ -361,7 +391,8 @@ class ConfigUpdater {
     private fun shouldUpdateApplication(application: ApplicationConfig): Boolean {
         val oldConfig = SettingsHelper.getInstance(context!!).getConfig()
         val oldConfigApplications = oldConfig?.applications ?: emptyList()
-        val oldApplication = oldConfigApplications.find { it.application.pkg == application.application.pkg && !it.remove }
+        val oldApplication =
+            oldConfigApplications.find { it.application.pkg == application.application.pkg && !it.remove }
         return oldApplication == null || !InstallUtils.areVersionsEqual(
             application.version.versionName,
             application.version.versionCode,

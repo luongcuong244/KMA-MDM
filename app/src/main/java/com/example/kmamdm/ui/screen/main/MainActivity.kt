@@ -47,7 +47,9 @@ import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.AdministratorModeDialog
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
+import com.example.kmamdm.ui.dialog.EnterDeviceIdDialog
 import com.example.kmamdm.ui.dialog.ManageStorageDialog
+import com.example.kmamdm.ui.dialog.NetworkErrorDialog
 import com.example.kmamdm.ui.dialog.OverlaySettingsDialog
 import com.example.kmamdm.ui.dialog.UnknownSourcesDialog
 import com.example.kmamdm.ui.screen.adminmoderequest.AdminModeRequestActivity
@@ -59,6 +61,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.system.exitProcess
 
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
@@ -82,6 +85,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private val handler = Handler()
 
     private var kioskUnlockCounter = 0
+    private var configFault = false
 
     private var floatingButtonService: FloatingButtonService? = null
     private var isBound = false
@@ -160,6 +164,11 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     override fun onResume() {
         super.onResume()
+        if (interruptResumeFlow) {
+            interruptResumeFlow = false
+            return
+        }
+
         if (firstStartAfterProvisioning) {
             firstStartAfterProvisioning = false
             waitForProvisioning(10)
@@ -395,6 +404,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                         this@MainActivity,
                         MainActivity::class.java
                     )
+                    interruptResumeFlow = true
                     restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     startActivity(restoreLauncherIntent)
                     // createAndShowEnterPasswordDialog()
@@ -512,10 +522,84 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     override fun onConfigUpdateServerError(errorText: String?) {
-        showContent()
+        networkErrorDetails = errorText
+        enterDeviceIdDialog = EnterDeviceIdDialog(
+            error = true,
+            deviceID = SettingsHelper.getInstance(this).getDeviceId(),
+            onClickExit = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    finishAffinity()
+                }
+                exitProcess(0)
+            },
+            onClickSave = {
+                if (it.isNotEmpty()) {
+                    SettingsHelper.getInstance(this).setDeviceId(it)
+                    updateConfig(true)
+                }
+            },
+            onClickDetails = {
+                showErrorDetails()
+            },
+        )
+        enterDeviceIdDialog?.show(supportFragmentManager,  "EnterDeviceIdDialog")
     }
 
     override fun onConfigUpdateNetworkError(errorText: String?) {
+        if (KioskUtils.isKioskModeRunning(this) && SettingsHelper.getInstance(this).getConfig() != null) {
+            interruptResumeFlow = true
+            val restoreLauncherIntent = Intent(this@MainActivity, MainActivity::class.java)
+            restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            startActivity(restoreLauncherIntent)
+        }
+        val settingsHelper = SettingsHelper.getInstance(this)
+        // show error dialog
+        networkErrorDetails = errorText
+        networkErrorDialog = NetworkErrorDialog(
+            // showWifiButton = settingsHelper.getConfig() == null || (settingsHelper.getConfig() != null && settingsHelper.getConfig().isShowWifi())
+            showWifiButton = settingsHelper.getConfig() == null,
+            onClickRetry = {
+                updateConfig(true)
+            },
+            onClickWifi = {
+//                if (KioskUtils.isKioskModeRunning(this)) {
+//                    val kioskApp: String = settingsHelper.getConfig().getMainApp()
+//                    KioskUtils.startCosuKioskMode(kioskApp, this, true)
+//                }
+                handler.postDelayed({ startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }, 500)
+            },
+            onClickCancel = {
+                if (configFault) {
+                    Log.i(
+                        Const.LOG_TAG,
+                        "networkErrorCancelClicked(): no configuration available, quit"
+                    )
+                    Toast.makeText(
+                        this, getString(
+                            R.string.critical_server_failure,
+                            getString(R.string.white_app_name)
+                        ), Toast.LENGTH_LONG
+                    ).show()
+                    finish()
+                }
+                Log.i(Const.LOG_TAG, "networkErrorCancelClicked()")
+                if (settingsHelper.getConfig() != null) {
+                    showContent()
+                } else {
+                    Log.i(
+                        Const.LOG_TAG,
+                        "networkErrorCancelClicked(): no configuration available, retrying"
+                    )
+                    Toast.makeText(this, R.string.empty_configuration, Toast.LENGTH_LONG).show()
+                    configFault = true
+                    updateConfig(false)
+                }
+            },
+            onClickDetails = {
+                showErrorDetails()
+            }
+        )
+        networkErrorDialog?.show(supportFragmentManager, "NetworkErrorDialog")
     }
 
     override fun onConfigLoaded() {
@@ -768,5 +852,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     companion object {
         private const val PAUSE_BETWEEN_AUTORUNS_SEC = 3
         private var configInitialized: Boolean = false
+
+        // This flag is used to exit kiosk to avoid looping in onResume()
+        private var interruptResumeFlow: Boolean = false
     }
 }

@@ -2,7 +2,6 @@ package com.example.kmamdm.utils
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
@@ -50,6 +49,20 @@ object Utils {
             return isAdminActive
         } catch (e: Exception) {
             return true
+        }
+    }
+
+    fun factoryReset(context: Context): Boolean {
+        try {
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                dpm.wipeData(0)
+            } else {
+                dpm.wipeDevice(0)
+            }
+            return true
+        } catch (e: java.lang.Exception) {
+            return false
         }
     }
 

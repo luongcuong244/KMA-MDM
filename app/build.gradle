@@ -15,6 +15,9 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // A shared secret to sign server config requests
+        buildConfigField("String", "REQUEST_SIGNATURE", "\"khoa_bi_mat_giua_mobile_and_server\"")
     }
 
     buildTypes {

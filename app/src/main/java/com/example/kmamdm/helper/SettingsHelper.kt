@@ -64,6 +64,25 @@ class SettingsHelper(context: Context) {
             .commit()
     }
 
+    fun getDeviceId(): String? {
+        return sharedPreferences.getString(PACKAGE_NAME + PREF_KEY_DEVICE_ID, "")
+    }
+
+    fun setDeviceId(deviceId: String?): Boolean {
+        return sharedPreferences.edit().putString(PACKAGE_NAME + PREF_KEY_DEVICE_ID, deviceId)
+            .commit()
+    }
+
+    // Warning: this may return false if the launcher has been updated from older version
+    fun isQrProvisioning(): Boolean {
+        return sharedPreferences.getBoolean(PACKAGE_NAME + PREF_QR_PROVISIONING, false)
+    }
+
+    fun setQrProvisioning(value: Boolean): Boolean {
+        return sharedPreferences.edit().putBoolean(PACKAGE_NAME + PREF_QR_PROVISIONING, value)
+            .commit()
+    }
+
     companion object {
         private const val PREFERENCES_ID = ".helpers.PREFERENCES"
         private const val PREF_KEY_CONFIG = ".helpers.CONFIG"
