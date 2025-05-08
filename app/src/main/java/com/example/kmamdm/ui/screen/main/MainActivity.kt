@@ -523,6 +523,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     override fun onConfigUpdateServerError(errorText: String?) {
         networkErrorDetails = errorText
+        Log.d(Const.LOG_TAG, "Server error: $errorText")
         enterDeviceIdDialog = EnterDeviceIdDialog(
             error = true,
             deviceID = SettingsHelper.getInstance(this).getDeviceId(),

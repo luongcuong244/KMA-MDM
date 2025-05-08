@@ -1,6 +1,13 @@
 package com.example.kmamdm.utils
 
 object Const {
+
+    object SocketAction {
+        const val SOCKET_CONNECTED = "SOCKET_CONNECTED"
+        const val SOCKET_DISCONNECTED = "SOCKET_DISCONNECTED"
+        const val SOCKET_ERROR = "SOCKET_ERROR"
+    }
+
     const val  REQUEST_INSTALL = 1011
 
     const val TASK_SUCCESS: Int = 0

@@ -19,6 +19,7 @@ import com.example.kmamdm.model.ApplicationConfig
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
+import com.example.kmamdm.socket.SocketManager
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.DeviceUtils
 import com.example.kmamdm.utils.InstallUtils
@@ -184,7 +185,7 @@ class ConfigUpdater {
 
         uiNotifier?.onConfigUpdateStart()
 
-        val deviceId = settingsHelper.getDeviceId()
+        val deviceId = settingsHelper.getDeviceId() ?: ""
         var signature = ""
         try {
             signature = CryptoHelper.getSHA1String(BuildConfig.REQUEST_SIGNATURE + deviceId)
@@ -195,6 +196,7 @@ class ConfigUpdater {
 
         ConfigurationRepository.getServerConfig(
             signature,
+            deviceId,
             deviceInfo,
             object : Callback<ServerConfigResponse> {
                 override fun onResponse(
@@ -202,6 +204,12 @@ class ConfigUpdater {
                     response: Response<ServerConfigResponse>
                 ) {
                     if (response.isSuccessful && response.body() != null) {
+                        // connect socket
+                        if (!SocketManager.isSocketConnected) {
+                            SocketManager.get().destroy()
+                            SocketManager.get().openSocket(context)
+                        }
+
                         val config = response.body()!!.data
                         registerAppInstallReceiver()
 
@@ -235,11 +243,12 @@ class ConfigUpdater {
                             }
                         }
                     } else {
+                        val errorText = response.errorBody()?.string()
                         Log.e(
                             Const.LOG_TAG,
-                            "Config update failed: ${response.errorBody()?.string()}"
+                            "Config update failedd: $errorText"
                         )
-                        uiNotifier?.onConfigUpdateServerError(response.errorBody()?.string())
+                        uiNotifier?.onConfigUpdateServerError(errorText)
                         configInitializing = false
                     }
                 }

@@ -87,6 +87,7 @@ class SettingsHelper(context: Context) {
         private const val PREFERENCES_ID = ".helpers.PREFERENCES"
         private const val PREF_KEY_CONFIG = ".helpers.CONFIG"
         private const val PREF_KEY_KIOSK_MODE_RUNNING = ".helpers.KIOSK_MODE_RUNNING"
+        private const val PREF_KEY_SOCKET_CONNECTED = ".helpers.SOCKET_CONNECTED"
 
         private const val PREF_KEY_BASE_URL = ".helpers.BASE_URL"
         private const val PREF_KEY_SECONDARY_BASE_URL = ".helpers.SECONDARY_BASE_URL"
