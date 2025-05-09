@@ -36,6 +36,11 @@ class MyApplication : Application() {
                         .putExtra("error", error)
                 )
             }
+
+            override fun onReceiveViewDeviceStatus(webSocketId: String) {
+                // get device status
+
+            }
         })
     }
 }

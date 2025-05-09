@@ -16,10 +16,12 @@ public class SocketSignaling(
         fun onSocketConnected()
         fun onSocketDisconnected(reason: String)
         fun onError(error: String)
+        fun onReceiveViewDeviceStatus(webSocketId: String)
     }
 
     private object Event {
         const val SOCKET_ERROR = "SOCKET:ERROR"
+        const val MOBILE_RECEIVE_VIEW_DEVICE_STATUS = "mobile:receive:view_device_status"
         const val STREAM_CREATE = "STREAM:CREATE"
         const val STREAM_REMOVE = "STREAM:REMOVE"
         const val STREAM_START = "STREAM:START"
@@ -40,6 +42,7 @@ public class SocketSignaling(
 
         const val MESSAGE = "message"
         const val STATUS = "status"
+        const val WEB_SOCKET_ID = "webSocketId"
     }
 
     fun openSocket(context: Context) {
@@ -62,6 +65,10 @@ public class SocketSignaling(
             on(Event.SOCKET_ERROR) { args -> // Server always disconnects socket on this event. User reconnect
                 val message = (args?.firstOrNull() as? JSONObject)?.optString(Payload.MESSAGE) ?: ""
                 eventListener.onError(message)
+            }
+            on(Event.MOBILE_RECEIVE_VIEW_DEVICE_STATUS) { args ->
+                val webSocketId = (args?.firstOrNull() as? JSONObject)?.optString(Payload.WEB_SOCKET_ID) ?: ""
+                eventListener.onReceiveViewDeviceStatus(webSocketId)
             }
             open()
         }
