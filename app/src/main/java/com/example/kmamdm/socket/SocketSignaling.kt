@@ -1,18 +1,21 @@
 package com.example.kmamdm.socket
 
 import android.content.Context
+import android.util.Log
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.server.ServerAddress
+import com.example.kmamdm.socket.json.DeviceStatus
+import com.google.gson.Gson
 import io.socket.client.IO
 import io.socket.client.Socket
 import org.json.JSONObject
 
-public class SocketSignaling(
+class SocketSignaling(
     private val eventListener: EventListener,
 ) {
     private var socket: Socket? = null
 
-    public interface EventListener {
+    interface EventListener {
         fun onSocketConnected()
         fun onSocketDisconnected(reason: String)
         fun onError(error: String)
@@ -22,27 +25,15 @@ public class SocketSignaling(
     private object Event {
         const val SOCKET_ERROR = "SOCKET:ERROR"
         const val MOBILE_RECEIVE_VIEW_DEVICE_STATUS = "mobile:receive:view_device_status"
-        const val STREAM_CREATE = "STREAM:CREATE"
-        const val STREAM_REMOVE = "STREAM:REMOVE"
-        const val STREAM_START = "STREAM:START"
-        const val STREAM_STOP = "STREAM:STOP"
-        const val HOST_OFFER = "HOST:OFFER"
-        const val HOST_CANDIDATE = "HOST:CANDIDATE"
-        const val STREAM_JOIN = "STREAM:JOIN"
-        const val STREAM_LEAVE = "STREAM:LEAVE"
-        const val CLIENT_ANSWER = "CLIENT:ANSWER"
-        const val CLIENT_CANDIDATE = "CLIENT:CANDIDATE"
-        const val REMOVE_CLIENT = "REMOVE:CLIENT"
-        const val CLIENT_CLICK = "CLIENT:CLICK"
-        const val CLIENT_SWIPE = "CLIENT:SWIPE"
+        const val MOBILE_SEND_DEVICE_STATUS = "mobile:send:device_status"
     }
 
     private object Payload {
         const val WEB_SOCKET_AUTH_TOKEN = "hostToken"
 
         const val MESSAGE = "message"
-        const val STATUS = "status"
         const val WEB_SOCKET_ID = "webSocketId"
+        const val DEVICE_STATUS = "deviceStatus"
     }
 
     fun openSocket(context: Context) {
@@ -72,6 +63,14 @@ public class SocketSignaling(
             }
             open()
         }
+    }
+
+    fun sendDeviceStatus(webSocketId: String, deviceStatus: DeviceStatus) {
+        val gson = Gson()
+        val jsonObject = JSONObject()
+        jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
+        jsonObject.put(Payload.DEVICE_STATUS, gson.toJson(deviceStatus))
+        socket?.emit(Event.MOBILE_SEND_DEVICE_STATUS, jsonObject)
     }
 
     fun destroy() {

@@ -7,6 +7,7 @@ import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.socket.SocketManager
 import com.example.kmamdm.socket.SocketSignaling
 import com.example.kmamdm.utils.Const
+import com.example.kmamdm.utils.DeviceUtils
 import com.example.kmamdm.utils.SharePrefUtils
 
 class MyApplication : Application() {
@@ -38,8 +39,8 @@ class MyApplication : Application() {
             }
 
             override fun onReceiveViewDeviceStatus(webSocketId: String) {
-                // get device status
-
+                val deviceStatus = DeviceUtils.getDeviceStatus(this@MyApplication)
+                SocketManager.get().sendDeviceStatus(webSocketId, deviceStatus)
             }
         })
     }

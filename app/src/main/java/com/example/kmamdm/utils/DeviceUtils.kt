@@ -2,10 +2,19 @@ package com.example.kmamdm.utils
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Environment
+import android.os.StatFs
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import com.example.kmamdm.model.DeviceInfo
+import com.example.kmamdm.socket.json.DeviceStatus
 
 object DeviceUtils {
     private var deviceInfo: DeviceInfo? = null
@@ -86,5 +95,99 @@ object DeviceUtils {
             @Suppress("DEPRECATION")
             Build.SERIAL
         }
+    }
+
+    fun getDeviceStatus(context: Context): DeviceStatus {
+        val deviceInfo = getDeviceInfo(context)
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        val isCharging = batteryManager.isCharging
+        val batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val batteryStatus = getBatteryStatus(context)
+
+        val storageUsage = getStorageUsage()
+        val ramUsage = getRamUsage()
+        val isLocked = isDeviceLocked(context)
+        val networkType = getNetworkType(context)
+        val locationEnabled = isLocationEnabled(context)
+        val location = getCurrentLocation(context)
+
+        return DeviceStatus(
+            deviceInfo = deviceInfo,
+            batteryLevel = batteryLevel,
+            batteryStatus = batteryStatus,
+            isCharging = isCharging,
+            storageUsage = storageUsage,
+            ramUsage = ramUsage,
+            isLocked = isLocked,
+            networkType = networkType,
+            locationEnabled = locationEnabled,
+            location = location
+        )
+    }
+
+    private fun getBatteryStatus(context: Context): String {
+        val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        return when (status) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+            BatteryManager.BATTERY_STATUS_FULL -> "Full"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not Charging"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getStorageUsage(): Long {
+        val stat = StatFs(Environment.getDataDirectory().path)
+        val total = stat.totalBytes
+        val free = stat.availableBytes
+        val used = total - free
+        return used
+    }
+
+    private fun getRamUsage(): Long {
+        val runtime = Runtime.getRuntime()
+        val used = runtime.totalMemory() - runtime.freeMemory()
+        return used
+    }
+
+    private fun isDeviceLocked(context: Context): Boolean {
+        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+        return keyguardManager.isKeyguardLocked
+    }
+
+    private fun getNetworkType(context: Context): String {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return "None"
+        val capabilities = cm.getNetworkCapabilities(network) ?: return "None"
+        return when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+            else -> "Unknown"
+        }
+    }
+
+    private fun isLocationEnabled(context: Context): Boolean {
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun getCurrentLocation(context: Context): String {
+        // Lưu ý: cần cấp quyền ACCESS_FINE_LOCATION hoặc ACCESS_COARSE_LOCATION trước khi dùng
+        // Nếu không có quyền, trả về "Unknown"
+        if (context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return "Permission denied"
+        }
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val providers = locationManager.getProviders(true)
+        for (provider in providers) {
+            val location: Location? = locationManager.getLastKnownLocation(provider)
+            if (location != null) {
+                return "${location.latitude},${location.longitude}"
+            }
+        }
+        return "Unknown"
     }
 }
