@@ -1,6 +1,8 @@
 package com.example.kmamdm.utils
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -8,7 +10,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.content.pm.PermissionInfo
+import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
 import android.provider.Settings.SettingNotFoundException
@@ -214,5 +219,163 @@ object Utils {
             } catch (_: java.lang.Exception) {
             }
         }
+    }
+
+    fun isMobileDataEnabled(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        // A hack: use private API
+        // https://stackoverflow.com/questions/12686899/test-if-background-data-and-packet-data-is-enabled-or-not?rq=1
+        try {
+            val clazz = Class.forName(cm.javaClass.name)
+            val method = clazz.getDeclaredMethod("getMobileDataEnabled")
+            method.isAccessible = true // Make the method callable
+            // get the setting for "mobile data"
+            return method.invoke(cm) as Boolean
+        } catch (e: java.lang.Exception) {
+            // Let it will be true by default
+            return true
+        }
+    }
+
+    fun autoGrantRequestedPermissions(
+        context: Context, packageName: String,
+        appPermissionStrategy: String? = null,
+        forceSdCardPermissions: Boolean = false
+    ): Boolean {
+        var locationPermissionState = DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+        var otherPermissionsState = DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
+
+        /*// Determine the app permission strategy
+        if (ServerConfig.APP_PERMISSIONS_ASK_LOCATION == appPermissionStrategy) {
+            locationPermissionState = DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT
+        } else if (ServerConfig.APP_PERMISSIONS_DENY_LOCATION == appPermissionStrategy) {
+            locationPermissionState = DevicePolicyManager.PERMISSION_GRANT_STATE_DENIED
+        } else if (ServerConfig.APP_PERMISSIONS_ASK_ALL == appPermissionStrategy) {
+            locationPermissionState = DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT
+            if (packageName != context.packageName) {
+                otherPermissionsState = DevicePolicyManager.PERMISSION_GRANT_STATE_DEFAULT
+            }
+        }*/
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            val permissions: MutableList<String> = getRuntimePermissions(
+                    context.packageManager,
+                    packageName
+                )
+
+            // Some devices do not include SD card permissions in the list of runtime permissions
+            // So the files could not be read or written.
+            // Here we add SD card permissions manually (device owner can grant them!)
+            // This is done for the Headwind MDM launcher only
+            if (forceSdCardPermissions) {
+                var hasReadExtStorage = false
+                var hasWriteExtStorage = false
+                for (s in permissions) {
+                    if (s == Manifest.permission.READ_EXTERNAL_STORAGE) {
+                        hasReadExtStorage = true
+                    }
+                    if (s == Manifest.permission.WRITE_EXTERNAL_STORAGE) {
+                        hasWriteExtStorage = true
+                    }
+                }
+                if (!hasReadExtStorage) {
+                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+                if (!hasWriteExtStorage) {
+                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }
+
+            for (permission in permissions) {
+                val permissionState =
+                    if (isLocationPermission(permission)) locationPermissionState else otherPermissionsState
+                if (devicePolicyManager.getPermissionGrantState(
+                        adminComponentName,
+                        packageName, permission
+                    ) != permissionState
+                ) {
+                    val success = devicePolicyManager.setPermissionGrantState(
+                        adminComponentName,
+                        packageName, permission, permissionState
+                    )
+                    if (!success) {
+                        return false
+                    }
+                }
+            }
+        } catch (e: NoSuchMethodError) {
+            // This exception is raised on Android 5.1
+            e.printStackTrace()
+            return false
+        } catch (e: java.lang.Exception) {
+            // No active admin ComponentInfo (not sure why could that happen)
+            e.printStackTrace()
+            return false
+        }
+        Log.i(Const.LOG_TAG, "Permissions automatically granted")
+        return true
+    }
+
+    private fun isLocationPermission(permission: String): Boolean {
+        return Manifest.permission.ACCESS_COARSE_LOCATION == permission ||
+                Manifest.permission.ACCESS_FINE_LOCATION == permission ||
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION == permission
+    }
+
+    private fun getRuntimePermissions(
+        packageManager: PackageManager,
+        packageName: String
+    ): MutableList<String> {
+        val permissions: MutableList<String> = ArrayList()
+        val packageInfo: PackageInfo?
+        try {
+            packageInfo =
+                packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+        } catch (e: PackageManager.NameNotFoundException) {
+            return permissions
+        }
+
+        var manageStorage = false
+        if (packageInfo?.requestedPermissions != null) {
+            for (requestedPerm in packageInfo.requestedPermissions!!) {
+                if (requestedPerm == Manifest.permission.MANAGE_EXTERNAL_STORAGE) {
+                    manageStorage = true
+                }
+                if (isRuntimePermission(packageManager, requestedPerm)) {
+                    permissions.add(requestedPerm)
+                }
+            }
+            // There's a bug in Android 11+: MANAGE_EXTERNAL_STORAGE can't be automatically granted
+            // but if Headwind MDM is granting WRITE_EXTERNAL_STORAGE, then the app can't request
+            // MANAGE_EXTERNAL_STORAGE, it's locked!
+            // So the workaround is do not request WRITE_EXTERNAL_STORAGE in this case
+            if (manageStorage && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                permissions.removeIf { s: String ->
+                    (s == Manifest.permission.WRITE_EXTERNAL_STORAGE ||
+                            s == Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            }
+        }
+        return permissions
+    }
+
+    private fun isRuntimePermission(packageManager: PackageManager, permission: String): Boolean {
+        try {
+            val pInfo = packageManager.getPermissionInfo(permission, 0)
+            if (pInfo != null) {
+                if ((pInfo.protectionLevel and PermissionInfo.PROTECTION_MASK_BASE)
+                    == PermissionInfo.PROTECTION_DANGEROUS
+                ) {
+                    return true
+                }
+            }
+        } catch (e: PackageManager.NameNotFoundException) {
+        }
+        return false
     }
 }

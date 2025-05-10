@@ -13,6 +13,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.util.Log
 import com.example.kmamdm.model.DeviceInfo
 import com.example.kmamdm.socket.json.DeviceStatus
 
@@ -148,6 +149,7 @@ object DeviceUtils {
     private fun getRamUsage(): Long {
         val runtime = Runtime.getRuntime()
         val used = runtime.totalMemory() - runtime.freeMemory()
+        Log.i("DeviceUtils", "Used RAM: $used")
         return used
     }
 

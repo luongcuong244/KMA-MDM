@@ -1,8 +1,12 @@
 package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
+import android.app.Dialog
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -18,15 +22,19 @@ import android.os.Handler
 import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.Surface
 import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.ViewGroup
+import android.view.Window
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.databinding.DataBindingUtil
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.GridLayoutManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
@@ -35,6 +43,7 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
+import com.example.kmamdm.databinding.DialogSystemSettingsBinding
 import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
 import com.example.kmamdm.helper.SettingsHelper
@@ -43,6 +52,8 @@ import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.pro.KioskUtils
 import com.example.kmamdm.service.FloatingButtonService
 import com.example.kmamdm.service.FloatingButtonService.LocalBinder
+import com.example.kmamdm.service.SocketService
+import com.example.kmamdm.service.StatusControlService
 import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.AdministratorModeDialog
@@ -90,6 +101,50 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private var floatingButtonService: FloatingButtonService? = null
     private var isBound = false
 
+    private var systemSettingsDialog: Dialog? = null
+    private var dialogSystemSettingsBinding: DialogSystemSettingsBinding? = null
+
+    private val REQUEST_CODE_GPS_STATE_CHANGE = 1
+    private var isBackground = false
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(p0: Context?, intent: Intent?) {
+            Log.d(
+                Const.LOG_TAG,
+                "MainActivity: receiver onReceive(): ${intent?.action}"
+            )
+            when (intent?.action) {
+                Const.ACTION_POLICY_VIOLATION -> {
+                    Log.d(
+                        Const.LOG_TAG,
+                        "ACTION_POLICY_VIOLATION: ${intent.getIntExtra(Const.POLICY_VIOLATION_CAUSE, 0)}"
+                    )
+                    Log.d(
+                        Const.LOG_TAG,
+                        "isBackground: $isBackground"
+                    )
+                    if (isBackground) {
+                        // If we're in the background, let's bring Headwind MDM to top and the notification will be raised in onResume
+                        val restoreLauncherIntent = Intent(this@MainActivity, MainActivity::class.java)
+                        restoreLauncherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        this@MainActivity.startActivity(restoreLauncherIntent)
+                    } else {
+                        // Calling startActivity always calls onPause / onResume which is not what we want
+                        // So just show dialog if it isn't already shown
+                        if (systemSettingsDialog == null || !systemSettingsDialog!!.isShowing) {
+                            notifyPolicyViolation(
+                                intent.getIntExtra(
+                                    Const.POLICY_VIOLATION_CAUSE,
+                                    0
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private val serviceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             val binder = service as LocalBinder
@@ -133,6 +188,11 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             unbindService(serviceConnection)
             isBound = false
         }
+        try {
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun createViewModel() = MainViewModel::class.java
@@ -152,6 +212,9 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         ) {
             firstStartAfterProvisioning = true
         }
+
+        startServicesWithRetry()
+        initReceiver()
     }
 
     override fun initView() {
@@ -162,8 +225,25 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     }
 
+    private fun initReceiver() {
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(Const.ACTION_UPDATE_CONFIGURATION)
+        intentFilter.addAction(Const.ACTION_HIDE_SCREEN)
+        intentFilter.addAction(Const.ACTION_EXIT)
+        intentFilter.addAction(Const.ACTION_POLICY_VIOLATION)
+        intentFilter.addAction(Const.ACTION_EXIT_KIOSK)
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, intentFilter)
+        Log.d(
+            Const.LOG_TAG,
+            "MainActivity: receiver registered"
+        )
+    }
+
     override fun onResume() {
         super.onResume()
+
+        isBackground = false
+
         if (interruptResumeFlow) {
             interruptResumeFlow = false
             return
@@ -175,6 +255,14 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         } else {
             setDefaultLauncherEarly()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        isBackground = true
+
+
     }
 
     private fun waitForProvisioning(attempts: Int) {
@@ -375,7 +463,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private fun startLauncher() {
         if (!configInitialized) {
             Log.i(Const.LOG_TAG, "Updating configuration in startLauncher()")
-            updateConfig()
+            updateConfig(true)
         } else {
             showContent()
         }
@@ -498,7 +586,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         if (v == infoView) {
             // createAndShowInfoDialog()
         } else if (v == updateView) {
-            updateConfig()
+            updateConfig(true)
         }
     }
 
@@ -848,6 +936,161 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             }, (pause * 1000).toLong())
             pause += PAUSE_BETWEEN_AUTORUNS_SEC
         }
+    }
+
+    private fun postDelayedSystemSettingDialog(message: String, settingsIntent: Intent) {
+        postDelayedSystemSettingDialog(message, settingsIntent, null)
+    }
+
+    private fun postDelayedSystemSettingDialog(
+        message: String,
+        settingsIntent: Intent,
+        requestCode: Int?
+    ) {
+        postDelayedSystemSettingDialog(message, settingsIntent, requestCode!!, false)
+    }
+
+    private fun postDelayedSystemSettingDialog(
+        message: String,
+        settingsIntent: Intent?,
+        requestCode: Int,
+        forceEnableSettings: Boolean
+    ) {
+        if (settingsIntent != null) {
+            // If settings are controlled by usage stats, safe settings are allowed, so we need to enable settings in accessibility mode only
+            // Accessibility mode is only enabled when usage stats is off
+            if (preferences.getInt(
+                    Const.PREFERENCES_ACCESSIBILITY_SERVICE,
+                    Const.PREFERENCES_OFF
+                ) == Const.PREFERENCES_ON || forceEnableSettings
+            ) {
+                LocalBroadcastManager.getInstance(this)
+                    .sendBroadcast(Intent(Const.ACTION_ENABLE_SETTINGS))
+            }
+            LocalBroadcastManager.getInstance(this).sendBroadcast(Intent(Const.ACTION_STOP_CONTROL))
+        }
+        // Delayed start prevents the race of ENABLE_SETTINGS handle and tapping "Next" button
+        handler.postDelayed({
+            createAndShowSystemSettingDialog(
+                message,
+                settingsIntent,
+                requestCode
+            )
+        }, 5000)
+    }
+
+    private fun createAndShowSystemSettingDialog(
+        message: String,
+        settingsIntent: Intent?,
+        requestCode: Int
+    ) {
+        dismissDialog(systemSettingsDialog)
+        systemSettingsDialog = Dialog(this)
+        dialogSystemSettingsBinding = DataBindingUtil.inflate(
+            LayoutInflater.from(this),
+            R.layout.dialog_system_settings,
+            null,
+            false
+        )
+        systemSettingsDialog!!.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        systemSettingsDialog!!.setCancelable(false)
+
+        systemSettingsDialog!!.setContentView(dialogSystemSettingsBinding!!.getRoot())
+
+        dialogSystemSettingsBinding!!.setMessage(message)
+
+        // Since we need to send Intent to the listener, here we don't use "event" attribute in XML resource as everywhere else
+        systemSettingsDialog!!.findViewById<View>(R.id.continueButton).setOnClickListener(
+            View.OnClickListener {
+                dismissDialog(systemSettingsDialog)
+                if (settingsIntent == null) {
+                    return@OnClickListener
+                }
+                // Enable settings once again, because the dialog may be shown more than 3 minutes
+                // This is not necessary: the problem is resolved by clicking "Continue" in a popup window
+                /*LocalBroadcastManager.getInstance( MainActivity.this ).sendBroadcast( new Intent( Const.ACTION_ENABLE_SETTINGS ) );
+                    // Open settings with a slight delay so Broadcast would certainly be handled
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            startActivity(settingsIntent);
+                        }
+                    }, 300);*/
+                try {
+                    startActivityOptionalResult(settingsIntent, requestCode)
+                } catch (e: java.lang.Exception) {
+                    // Open settings by default
+                    startActivityOptionalResult(Intent(Settings.ACTION_SETTINGS), requestCode)
+                }
+            })
+
+        try {
+            systemSettingsDialog!!.show()
+        } catch (e: java.lang.Exception) {
+            // BadTokenException: activity closed before dialog is shown
+            e.printStackTrace()
+            systemSettingsDialog = null
+        }
+    }
+
+    private fun startActivityOptionalResult(intent: Intent, requestCode: Int?) {
+        if (requestCode != null) {
+            startActivityForResult(intent, requestCode)
+        } else {
+            startActivity(intent)
+        }
+    }
+
+    private fun notifyPolicyViolation(cause: Int) {
+        when (cause) {
+            Const.GPS_ON_REQUIRED -> postDelayedSystemSettingDialog(
+                getString(R.string.message_turn_on_gps),
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), REQUEST_CODE_GPS_STATE_CHANGE
+            )
+
+            Const.GPS_OFF_REQUIRED -> postDelayedSystemSettingDialog(
+                getString(R.string.message_turn_off_gps),
+                Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), REQUEST_CODE_GPS_STATE_CHANGE
+            )
+
+            Const.MOBILE_DATA_ON_REQUIRED -> createAndShowSystemSettingDialog(
+                getString(R.string.message_turn_on_mobile_data),
+                null,
+                0
+            )
+
+            Const.MOBILE_DATA_OFF_REQUIRED -> createAndShowSystemSettingDialog(
+                getString(R.string.message_turn_off_mobile_data),
+                null,
+                0
+            )
+        }
+    }
+
+    private fun startServicesWithRetry() {
+        try {
+            startServices()
+        } catch (e: java.lang.Exception) {
+            // Android OS bug!!!
+            e.printStackTrace()
+
+            // Repeat an attempt to start services after one second
+            handler.postDelayed({
+                try {
+                    startServices()
+                } catch (e: java.lang.Exception) {
+                    // Still failed, now give up!
+                    // startService may fail after resuming, but the service may be already running (there's a WorkManager)
+                    // So if we get an exception here, just ignore it and hope the app will work further
+                    e.printStackTrace()
+                }
+            }, 1000)
+        }
+    }
+
+    private fun startServices() {
+        StatusControlService.startService(this)
+        SocketService.startService(this)
     }
 
     companion object {

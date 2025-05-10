@@ -23,6 +23,7 @@ import com.example.kmamdm.socket.SocketManager
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.DeviceUtils
 import com.example.kmamdm.utils.InstallUtils
+import com.example.kmamdm.utils.SystemUtils
 import com.example.kmamdm.utils.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,6 +108,26 @@ class ConfigUpdater {
                                     "Install success: ${intent.getStringExtra(Const.PACKAGE_NAME)}"
                                 )
                                 val packageName = intent.getStringExtra(Const.PACKAGE_NAME)
+                                if (Utils.isDeviceOwner(context) && packageName != null) {
+                                    // Always grant all dangerous rights to the app
+                                    Utils.autoGrantRequestedPermissions(context, packageName)
+
+                                    // Automatically grant required permissions to aPuppet if we can
+                                    // Note: device owner can only grant permissions to self, not to other apps!
+                                    try {
+                                        SystemUtils.autoSetAccessibilityPermission(
+                                            context,
+                                            Const.APUPPET_PACKAGE_NAME,
+                                            Const.APUPPET_SERVICE_CLASS_NAME
+                                        )
+                                        SystemUtils.autoSetOverlayPermission(
+                                            context,
+                                            Const.APUPPET_PACKAGE_NAME
+                                        )
+                                    } catch (e: java.lang.Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
                                 uiNotifier?.onAppInstallComplete(packageName)
                                 conditionVariable.open()
                             }
@@ -204,6 +225,11 @@ class ConfigUpdater {
                     response: Response<ServerConfigResponse>
                 ) {
                     if (response.isSuccessful && response.body() != null) {
+                        // set self permissions
+                        if (Utils.isDeviceOwner(context)) {
+                            setSelfPermissions()
+                        }
+
                         // connect socket
                         if (!SocketManager.isSocketConnected) {
                             SocketManager.get().destroy()
@@ -240,6 +266,11 @@ class ConfigUpdater {
                                 // save config to share pref
                                 settingsHelper.updateConfig(config)
                                 uiNotifier?.onConfigUpdateComplete()
+                                Toast.makeText(
+                                    context,
+                                    "Config updated",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     } else {
@@ -402,6 +433,9 @@ class ConfigUpdater {
         val oldConfigApplications = oldConfig?.applications ?: emptyList()
         val oldApplication =
             oldConfigApplications.find { it.application.pkg == application.application.pkg && !it.remove }
+        if (oldApplication == null) {
+            return true
+        }
         return oldApplication == null || !InstallUtils.areVersionsEqual(
             application.version.versionName,
             application.version.versionCode,
@@ -421,5 +455,11 @@ class ConfigUpdater {
 
     fun getApplicationsForRun(): MutableList<Application> {
         return applicationsForRun
+    }
+
+    private fun setSelfPermissions() {
+        Utils.autoGrantRequestedPermissions(
+            context!!, context!!.packageName, null, true
+        )
     }
 }

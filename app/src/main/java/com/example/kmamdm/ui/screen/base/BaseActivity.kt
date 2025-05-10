@@ -1,5 +1,6 @@
 package com.example.kmamdm.ui.screen.base
 
+import android.app.Dialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -72,5 +73,14 @@ abstract class BaseActivity<VM : ViewModel, DB : ViewDataBinding> : AppCompatAct
 
     fun showErrorDetails() {
         ErrorDetailsActivity.display(this, networkErrorDetails, false)
+    }
+
+    protected fun dismissDialog(dialog: Dialog?) {
+        if (dialog != null) {
+            try {
+                dialog.dismiss()
+            } catch (ignored: Exception) {
+            }
+        }
     }
 }

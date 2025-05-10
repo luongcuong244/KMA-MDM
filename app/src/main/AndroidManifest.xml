@@ -136,6 +136,14 @@
             android:name=".service.FloatingButtonService"
             android:exported="false" />
 
+        <service
+            android:name=".service.SocketService"
+            android:exported="false" />
+
+        <service
+            android:name=".service.StatusControlService"
+            android:exported="false" />
+
         <receiver
             android:name=".AdminReceiver"
             android:exported="true"

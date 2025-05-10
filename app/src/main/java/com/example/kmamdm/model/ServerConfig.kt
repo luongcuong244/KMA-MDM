@@ -3,6 +3,12 @@ package com.example.kmamdm.model
 import com.google.gson.annotations.SerializedName
 
 data class ServerConfig(
+    // Common Setting
+    @SerializedName("gps") val gps: String?,
+    @SerializedName("bluetooth") val bluetooth: String?,
+    @SerializedName("wifi") val wifi: String?,
+    @SerializedName("mobileData") val mobileData: String?,
+
     @SerializedName("applications") val applications: List<ApplicationConfig>,
     @SerializedName("applicationSettings") val applicationSettings: List<ApplicationSetting> = listOf(),
 
@@ -16,4 +22,10 @@ data class ServerConfig(
 
     @SerializedName("kioskMode") var kioskMode: Boolean?,
     @SerializedName("kioskApps") val kioskApps: List<String> = listOf(),
-)
+) {
+    companion object {
+        const val APP_PERMISSIONS_ASK_LOCATION: String = "asklocation"
+        const val APP_PERMISSIONS_DENY_LOCATION: String = "denylocation"
+        const val APP_PERMISSIONS_ASK_ALL: String = "askall"
+    }
+}
