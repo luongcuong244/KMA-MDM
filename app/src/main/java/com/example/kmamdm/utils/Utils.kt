@@ -2,7 +2,6 @@ package com.example.kmamdm.utils
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.annotation.TargetApi
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -13,13 +12,16 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.os.Build
+import android.os.UserManager
 import android.provider.Settings
 import android.provider.Settings.SettingNotFoundException
 import android.util.Log
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.screen.main.MainActivity
+import java.util.UUID
 
 
 object Utils {
@@ -377,5 +379,261 @@ object Utils {
         } catch (e: PackageManager.NameNotFoundException) {
         }
         return false
+    }
+
+    fun lockUsbStorage(lock: Boolean, context: Context): Boolean {
+        if (isDeviceOwner(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                // Deprecated way to lock USB
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                    Settings.Secure.putInt(
+                        context.contentResolver,
+                        Settings.Secure.USB_MASS_STORAGE_ENABLED,
+                        0
+                    )
+                } else {
+                    Settings.Global.putInt(
+                        context.contentResolver,
+                        Settings.Global.USB_MASS_STORAGE_ENABLED,
+                        0
+                    )
+                }
+            } catch (e: java.lang.Exception) {
+                return false
+            }
+            return true
+        }
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            if (lock) {
+                devicePolicyManager.addUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_USB_FILE_TRANSFER
+                )
+                devicePolicyManager.addUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
+                )
+            } else {
+                devicePolicyManager.clearUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_USB_FILE_TRANSFER
+                )
+                devicePolicyManager.clearUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA
+                )
+            }
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    fun setScreenTimeoutPolicy(lock: Boolean?, timeout: Int?, context: Context): Boolean {
+        if (!isDeviceOwner(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
+        }
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            if (lock == null || !lock) {
+                // This means we should unlock screen timeout
+                devicePolicyManager.clearUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_CONFIG_SCREEN_TIMEOUT
+                )
+            } else {
+                // Managed screen timeout
+                devicePolicyManager.addUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_CONFIG_SCREEN_TIMEOUT
+                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && timeout != null) {
+                    // This option is available in Android 9 and above
+                    devicePolicyManager.setSystemSetting(
+                        adminComponentName,
+                        Settings.System.SCREEN_OFF_TIMEOUT,
+                        "" + (timeout * 1000)
+                    )
+                }
+            }
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    fun lockVolume(lock: Boolean?, context: Context): Boolean {
+        if (!isDeviceOwner(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
+        }
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            if (lock == null || !lock) {
+                Log.d(Const.LOG_TAG, "Unlocking volume")
+                devicePolicyManager.clearUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_ADJUST_VOLUME
+                )
+            } else {
+                Log.d(Const.LOG_TAG, "Locking volume")
+                devicePolicyManager.addUserRestriction(
+                    adminComponentName,
+                    UserManager.DISALLOW_ADJUST_VOLUME
+                )
+            }
+        } catch (e: java.lang.Exception) {
+            Log.w(Const.LOG_TAG, "Failed to lock/unlock volume: " + e.message)
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    fun setVolume(percent: Int, context: Context): Boolean {
+        val streams = intArrayOf(
+            AudioManager.STREAM_VOICE_CALL,
+            AudioManager.STREAM_SYSTEM,
+            AudioManager.STREAM_RING,
+            AudioManager.STREAM_MUSIC,
+            AudioManager.STREAM_ALARM
+        )
+        try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            for (s in streams) {
+                setVolumeInternal(audioManager, s, percent)
+
+                var v = audioManager.getStreamVolume(s)
+                if (v == 0) {
+                    v = 1
+                }
+            }
+            return true
+        } catch (e: java.lang.Exception) {
+            Log.w(Const.LOG_TAG, "Failed to set volume: " + e.message)
+            e.printStackTrace()
+            return false
+        }
+    }
+
+    @Throws(java.lang.Exception::class)
+    private fun setVolumeInternal(audioManager: AudioManager, stream: Int, percent: Int) {
+        val maxVolume = audioManager.getStreamMaxVolume(stream)
+        val volume = (maxVolume * percent) / 100
+        audioManager.setStreamVolume(stream, volume, 0)
+    }
+
+    fun disableScreenshots(disabled: Boolean?, context: Context): Boolean {
+        if (!isDeviceOwner(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
+        }
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            devicePolicyManager.setScreenCaptureDisabled(adminComponentName, disabled ?: false)
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    fun lockSafeBoot(context: Context): Boolean {
+        if (!isDeviceOwner(context) || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false
+        }
+
+        val devicePolicyManager = context.getSystemService(
+            Context.DEVICE_POLICY_SERVICE
+        ) as DevicePolicyManager
+        val adminComponentName = LegacyUtils.getAdminComponentName(context)
+
+        try {
+            devicePolicyManager.addUserRestriction(
+                adminComponentName,
+                UserManager.DISALLOW_SAFE_BOOT
+            )
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+            return false
+        }
+        return true
+    }
+
+    fun initPasswordReset(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val token: String = getDataToken(context)
+                val dpm =
+                    context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                val adminComponentName = LegacyUtils.getAdminComponentName(context)
+                if (dpm.setResetPasswordToken(adminComponentName, token.toByteArray())) {
+                    if (!dpm.isResetPasswordTokenActive(adminComponentName)) {
+                        Log.e(Const.LOG_TAG, "Password reset token will be activated once the user enters the current password next time.")
+                    }
+                } else {
+                    Log.e(Const.LOG_TAG, "Failed to setup password reset token, password reset requests will fail")
+                }
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun passwordReset(context: Context, password: String?): Boolean {
+        try {
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val adminComponentName = LegacyUtils.getAdminComponentName(context)
+                val tokenActive = dpm.isResetPasswordTokenActive(adminComponentName)
+                if (!tokenActive) {
+                    return false
+                }
+                return dpm.resetPasswordWithToken(
+                    adminComponentName,
+                    password,
+                    getDataToken(context).toByteArray(),
+                    0
+                )
+            } else {
+                return dpm.resetPassword(password, 0)
+            }
+        } catch (e: java.lang.Exception) {
+            return false
+        }
+    }
+
+    private fun getDataToken(context: Context): String {
+        var token = context.getSharedPreferences(Const.PREFERENCES, Context.MODE_PRIVATE)
+            .getString(Const.PREFERENCES_DATA_TOKEN, null)
+        if (token == null) {
+            token = UUID.randomUUID().toString()
+            context.getSharedPreferences(Const.PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .putString(Const.PREFERENCES_DATA_TOKEN, token)
+                .commit()
+        }
+        return token
     }
 }

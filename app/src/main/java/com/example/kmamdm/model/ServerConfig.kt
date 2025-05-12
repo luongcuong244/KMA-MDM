@@ -8,6 +8,13 @@ data class ServerConfig(
     @SerializedName("bluetooth") val bluetooth: String?,
     @SerializedName("wifi") val wifi: String?,
     @SerializedName("mobileData") val mobileData: String?,
+    @SerializedName("blockUSBStorage") val blockUSBStorage: Boolean?,
+    @SerializedName("manageScreenTimeout") val manageScreenTimeout: Boolean?,
+    @SerializedName("screenTimeout") val screenTimeout: Int?,
+    @SerializedName("lockVolume") val lockVolume: Boolean?,
+    @SerializedName("manageVolume") val manageVolume: Boolean?,
+    @SerializedName("volumeValue") val volumeValue: Int?,
+    @SerializedName("disableScreenCapture") val disableScreenCapture: Boolean?,
 
     @SerializedName("applications") val applications: List<ApplicationConfig>,
     @SerializedName("applicationSettings") val applicationSettings: List<ApplicationSetting> = listOf(),
@@ -22,6 +29,9 @@ data class ServerConfig(
 
     @SerializedName("kioskMode") var kioskMode: Boolean?,
     @SerializedName("kioskApps") val kioskApps: List<String> = listOf(),
+
+    // Other Settings
+    @SerializedName("passwordReset") val passwordReset: String?,
 ) {
     companion object {
         const val APP_PERMISSIONS_ASK_LOCATION: String = "asklocation"

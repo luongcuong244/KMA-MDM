@@ -2,6 +2,7 @@ package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -14,6 +15,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Point
 import android.graphics.drawable.Drawable
+import android.location.LocationManager
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -44,8 +47,11 @@ import com.bumptech.glide.request.target.Target
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.ActivityMainBinding
 import com.example.kmamdm.databinding.DialogSystemSettingsBinding
+import com.example.kmamdm.extension.isDisable
+import com.example.kmamdm.extension.isEnable
 import com.example.kmamdm.helper.ConfigUpdater
 import com.example.kmamdm.helper.ConfigUpdater.UINotifier
+import com.example.kmamdm.helper.Initializer
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ServerConfig
@@ -778,6 +784,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             return
         }
 
+        if (!applyEarlyPolicies(config)) {
+            // Here we go when the settings window is opened;
+            // Next time we're here after we returned from the Android settings through onResume()
+            return
+        }
+        applyLatePolicies(config)
+
         createButtons()
 
         scheduleInstalledAppsRun()
@@ -938,13 +951,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         }
     }
 
-    private fun postDelayedSystemSettingDialog(message: String, settingsIntent: Intent) {
+    private fun postDelayedSystemSettingDialog(message: String, settingsIntent: Intent?) {
         postDelayedSystemSettingDialog(message, settingsIntent, null)
     }
 
     private fun postDelayedSystemSettingDialog(
         message: String,
-        settingsIntent: Intent,
+        settingsIntent: Intent?,
         requestCode: Int?
     ) {
         postDelayedSystemSettingDialog(message, settingsIntent, requestCode!!, false)
@@ -953,7 +966,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private fun postDelayedSystemSettingDialog(
         message: String,
         settingsIntent: Intent?,
-        requestCode: Int,
+        requestCode: Int?,
         forceEnableSettings: Boolean
     ) {
         if (settingsIntent != null) {
@@ -982,7 +995,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private fun createAndShowSystemSettingDialog(
         message: String,
         settingsIntent: Intent?,
-        requestCode: Int
+        requestCode: Int?
     ) {
         dismissDialog(systemSettingsDialog)
         systemSettingsDialog = Dialog(this)
@@ -1091,6 +1104,83 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     private fun startServices() {
         StatusControlService.startService(this)
         SocketService.startService(this)
+    }
+
+    private fun applyEarlyPolicies(config: ServerConfig): Boolean {
+        Initializer.applyEarlyNonInteractivePolicies(this, config)
+        return true
+    }
+
+    private fun applyLatePolicies(config: ServerConfig): Boolean {
+        // To delay opening the settings activity
+        var dialogWillShow = false
+
+        if (config.gps != null) {
+            val lm = getSystemService(LOCATION_SERVICE) as LocationManager
+            if (lm != null) {
+                val enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                if (config.gps.isEnable() && !enabled) {
+                    dialogWillShow = true
+                    // System settings dialog should return result so we could re-initialize location service
+                    postDelayedSystemSettingDialog(
+                        getString(R.string.message_turn_on_gps),
+                        Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                        REQUEST_CODE_GPS_STATE_CHANGE
+                    )
+                } else if (config.gps.isDisable() && enabled) {
+                    dialogWillShow = true
+                    postDelayedSystemSettingDialog(
+                        getString(R.string.message_turn_off_gps),
+                        Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                        REQUEST_CODE_GPS_STATE_CHANGE
+                    )
+                }
+            }
+        }
+
+        if (config.mobileData != null) {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (cm != null && !dialogWillShow) {
+                try {
+                    val enabled = Utils.isMobileDataEnabled(this)
+                    //final Intent mobileDataSettingsIntent = new Intent();
+                    // One more hack: open the data transport activity
+                    // https://stackoverflow.com/questions/31700842/which-intent-should-open-data-usage-screen-from-settings
+                    //mobileDataSettingsIntent.setComponent(new ComponentName("com.android.settings",
+                    //        "com.android.settings.Settings$DataUsageSummaryActivity"));
+                    //Intent mobileDataSettingsIntent = new Intent(Intent.ACTION_MAIN);
+                    //mobileDataSettingsIntent.setClassName("com.android.phone", "com.android.phone.NetworkSetting");
+                    val mobileDataSettingsIntent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
+                    // Mobile data are turned on/off in the status bar! No settings (as the user can go back in settings and do something nasty)
+                    if (config.mobileData.isEnable() && !enabled) {
+                        postDelayedSystemSettingDialog(
+                            getString(R.string.message_turn_on_mobile_data),  /*mobileDataSettingsIntent*/
+                            null
+                        )
+                    } else if (config.mobileData.isDisable() && enabled) {
+                        postDelayedSystemSettingDialog(
+                            getString(R.string.message_turn_off_mobile_data),  /*mobileDataSettingsIntent*/
+                            null
+                        )
+                    }
+                } catch (e: java.lang.Exception) {
+                    // Some problem accessible private API
+                }
+            }
+        }
+
+//        if (!Utils.setPasswordMode(config.getPasswordMode(), this)) {
+//            val updatePasswordIntent = Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD)
+//            // Different Android versions/builds use different activities to setup password
+//            // So we have to enable temporary access to settings here (and only here!)
+//            postDelayedSystemSettingDialog(
+//                getString(R.string.message_set_password),
+//                updatePasswordIntent,
+//                null,
+//                true
+//            )
+//        }
+        return true
     }
 
     companion object {
