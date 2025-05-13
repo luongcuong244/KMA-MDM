@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.server.ServerAddress
 import com.example.kmamdm.socket.json.DeviceStatus
+import com.example.kmamdm.socket.json.PushMessage
 import com.google.gson.Gson
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -20,12 +21,15 @@ class SocketSignaling(
         fun onSocketDisconnected(reason: String)
         fun onError(error: String)
         fun onReceiveViewDeviceStatus(webSocketId: String)
+        fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>)
     }
 
     private object Event {
         const val SOCKET_ERROR = "SOCKET:ERROR"
         const val MOBILE_RECEIVE_VIEW_DEVICE_STATUS = "mobile:receive:view_device_status"
         const val MOBILE_SEND_DEVICE_STATUS = "mobile:send:device_status"
+        const val MOBILE_RECEIVE_PUSH_MESSAGES = "mobile:receive:push_messages"
+        const val MOBILE_SEND_PUSH_MESSAGES = "mobile:send:push_messages"
     }
 
     private object Payload {
@@ -34,6 +38,7 @@ class SocketSignaling(
         const val MESSAGE = "message"
         const val WEB_SOCKET_ID = "webSocketId"
         const val DEVICE_STATUS = "deviceStatus"
+        const val MESSAGES = "messages"
     }
 
     fun openSocket(context: Context) {
@@ -61,6 +66,20 @@ class SocketSignaling(
                 val webSocketId = (args?.firstOrNull() as? JSONObject)?.optString(Payload.WEB_SOCKET_ID) ?: ""
                 eventListener.onReceiveViewDeviceStatus(webSocketId)
             }
+            on(Event.MOBILE_RECEIVE_PUSH_MESSAGES) { args ->
+                val jsonObject = args?.firstOrNull() as? JSONObject ?: JSONObject()
+
+                val webSocketId = jsonObject.optString(Payload.WEB_SOCKET_ID, "")
+                val messagesJsonArray = jsonObject.optJSONArray(Payload.MESSAGES)
+
+                val messages: List<PushMessage> = if (messagesJsonArray != null) {
+                    Gson().fromJson(messagesJsonArray.toString(), Array<PushMessage>::class.java).toList()
+                } else {
+                    emptyList()
+                }
+
+                eventListener.onReceivePushMessages(webSocketId, messages)
+            }
             open()
         }
     }
@@ -71,6 +90,14 @@ class SocketSignaling(
         jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
         jsonObject.put(Payload.DEVICE_STATUS, gson.toJson(deviceStatus))
         socket?.emit(Event.MOBILE_SEND_DEVICE_STATUS, jsonObject)
+    }
+
+    fun sendPushMessages(webSocketId: String, messages: List<PushMessage>) {
+        val gson = Gson()
+        val jsonObject = JSONObject()
+        jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
+        jsonObject.put(Payload.MESSAGES, gson.toJson(messages))
+        socket?.emit(Event.MOBILE_SEND_PUSH_MESSAGES, jsonObject)
     }
 
     fun destroy() {

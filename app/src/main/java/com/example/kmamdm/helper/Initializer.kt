@@ -12,6 +12,7 @@ import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.InstallUtils
 import com.example.kmamdm.utils.Utils
+import com.example.kmamdm.worker.PushNotificationWorker
 
 object Initializer {
     fun init(context: Context) {

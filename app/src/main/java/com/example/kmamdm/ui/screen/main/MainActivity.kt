@@ -2,7 +2,6 @@ package com.example.kmamdm.ui.screen.main
 
 import android.annotation.SuppressLint
 import android.app.Dialog
-import android.app.admin.DevicePolicyManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -120,6 +119,9 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
                 "MainActivity: receiver onReceive(): ${intent?.action}"
             )
             when (intent?.action) {
+                Const.ACTION_UPDATE_CONFIGURATION -> {
+                    updateConfig(false)
+                }
                 Const.ACTION_POLICY_VIOLATION -> {
                     Log.d(
                         Const.LOG_TAG,
@@ -199,6 +201,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         }
+        SettingsHelper.getInstance(this).setMainActivityRunning(false)
     }
 
     override fun createViewModel() = MainViewModel::class.java
@@ -219,8 +222,12 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             firstStartAfterProvisioning = true
         }
 
+        Initializer.init(this)
+
         startServicesWithRetry()
         initReceiver()
+
+        SettingsHelper.getInstance(this).setMainActivityRunning(true)
     }
 
     override fun initView() {

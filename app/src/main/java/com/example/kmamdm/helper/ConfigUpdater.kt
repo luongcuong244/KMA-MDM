@@ -13,6 +13,7 @@ import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ApplicationConfig
@@ -66,6 +67,16 @@ class ConfigUpdater {
     private val applicationsForRun = mutableListOf<Application>()
 
     companion object {
+        fun notifyConfigUpdate(context: Context) {
+            if (SettingsHelper.getInstance(context).isMainActivityRunning()) {
+                Log.d(Const.LOG_TAG, "Main activity is running, using activity updater")
+                LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(Const.ACTION_UPDATE_CONFIGURATION))
+            } else {
+                Log.d(Const.LOG_TAG, "Main activity is not running, creating a new ConfigUpdater")
+                ConfigUpdater().updateConfig(context, null, false)
+            }
+        }
+
         fun forceConfigUpdate(context: Context, notifier: UINotifier?, userInteraction: Boolean) {
             ConfigUpdater().updateConfig(context, notifier, userInteraction)
         }

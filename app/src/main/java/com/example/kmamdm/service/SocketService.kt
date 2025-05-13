@@ -7,8 +7,10 @@ import android.os.IBinder
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.kmamdm.socket.SocketManager
 import com.example.kmamdm.socket.SocketSignaling
+import com.example.kmamdm.socket.json.PushMessage
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.DeviceUtils
+import com.example.kmamdm.worker.PushNotificationProcessor
 
 class SocketService : Service() {
     override fun onBind(intent: Intent?): IBinder? {
@@ -42,6 +44,13 @@ class SocketService : Service() {
             override fun onReceiveViewDeviceStatus(webSocketId: String) {
                 val deviceStatus = DeviceUtils.getDeviceStatus(this@SocketService)
                 SocketManager.get().sendDeviceStatus(webSocketId, deviceStatus)
+            }
+
+            override fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>) {
+                for (message in messages) {
+                    PushNotificationProcessor.process(message, this@SocketService)
+                }
+                SocketManager.get().sendPushMessages(webSocketId, messages)
             }
         })
         return START_STICKY

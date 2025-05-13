@@ -73,6 +73,24 @@ class SettingsHelper(context: Context) {
             .commit()
     }
 
+    fun getConfigUpdateTimestamp(): Long {
+        return sharedPreferences.getLong(PACKAGE_NAME + PREF_CFG_UPDATE_TIMESTAMP, 0)
+    }
+
+    fun setConfigUpdateTimestamp(timestamp: Long): Boolean {
+        return sharedPreferences.edit().putLong(PACKAGE_NAME + PREF_CFG_UPDATE_TIMESTAMP, timestamp)
+            .commit()
+    }
+
+    fun isMainActivityRunning(): Boolean {
+        return sharedPreferences.getBoolean(PACKAGE_NAME + PREF_KEY_ACTIVITY_RUNNING, false)
+    }
+
+    fun setMainActivityRunning(running: Boolean): Boolean {
+        return sharedPreferences.edit()
+            .putBoolean(PACKAGE_NAME + PREF_KEY_ACTIVITY_RUNNING, running).commit()
+    }
+
     // Warning: this may return false if the launcher has been updated from older version
     fun isQrProvisioning(): Boolean {
         return sharedPreferences.getBoolean(PACKAGE_NAME + PREF_QR_PROVISIONING, false)

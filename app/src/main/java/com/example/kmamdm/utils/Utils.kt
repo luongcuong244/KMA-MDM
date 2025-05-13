@@ -59,6 +59,20 @@ object Utils {
         }
     }
 
+    fun reboot(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return false
+        }
+        try {
+            val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponentName = LegacyUtils.getAdminComponentName(context)
+            dpm.reboot(adminComponentName)
+            return true
+        } catch (e: java.lang.Exception) {
+            return false
+        }
+    }
+
     fun factoryReset(context: Context): Boolean {
         try {
             val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
