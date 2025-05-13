@@ -31,11 +31,9 @@ data class ServerConfig(
     @SerializedName("kioskApps") val kioskApps: List<String> = listOf(),
 
     // Other Settings
+    @SerializedName("factoryReset") val factoryReset: Boolean?,
+    @SerializedName("reboot") val reboot: Boolean?,
+    @SerializedName("lock") val lock: Boolean?,
+    @SerializedName("lockMessage") val lockMessage: String?,
     @SerializedName("passwordReset") val passwordReset: String?,
-) {
-    companion object {
-        const val APP_PERMISSIONS_ASK_LOCATION: String = "asklocation"
-        const val APP_PERMISSIONS_DENY_LOCATION: String = "denylocation"
-        const val APP_PERMISSIONS_ASK_ALL: String = "askall"
-    }
-}
+)
