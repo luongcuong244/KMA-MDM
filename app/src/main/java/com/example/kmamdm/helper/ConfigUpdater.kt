@@ -17,6 +17,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ApplicationConfig
+import com.example.kmamdm.model.DeviceInfo
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
@@ -473,4 +474,46 @@ class ConfigUpdater {
             context!!, context!!.packageName, null, true
         )
     }
+
+    /*private fun checkFactoryReset() {
+        Log.d(Const.LOG_TAG, "checkFactoryReset() called")
+        val settingsHelper = SettingsHelper.getInstance(context!!)
+        val config: ServerConfig? = settingsHelper.getConfig()
+        if (config != null && config.getFactoryReset() != null && config.getFactoryReset()) {
+            // We got a factory reset request, let's confirm and erase everything!
+            RemoteLogger.log(context, Const.LOG_INFO, "Device reset by server request")
+            val confirmTask: ConfirmDeviceResetTask = object : ConfirmDeviceResetTask(context) {
+                protected override fun onPostExecute(result: Int?) {
+                    // Do a factory reset if we can
+                    if (result == null || result !== Const.TASK_SUCCESS) {
+                        RemoteLogger.log(
+                            context,
+                            Const.LOG_WARN,
+                            "Failed to confirm device reset on server"
+                        )
+                    } else if (Utils.checkAdminMode(context!!)) {
+                        // no_factory_reset restriction doesn't prevent against admin's reset action
+                        // So we do not need to release this restriction prior to resetting the device
+                        if (!Utils.factoryReset(context!!)) {
+                            RemoteLogger.log(context, Const.LOG_WARN, "Device reset failed")
+                        }
+                    } else {
+                        RemoteLogger.log(
+                            context,
+                            Const.LOG_WARN,
+                            "Device reset failed: no permissions"
+                        )
+                    }
+                    // If we can't, proceed the initialization flow
+                    checkRemoteReboot()
+                }
+            }
+
+            val deviceInfo: DeviceInfo = DeviceInfoProvider.getDeviceInfo(context, true, true)
+            deviceInfo.setFactoryReset(Utils.checkAdminMode(context!!))
+            confirmTask.execute(deviceInfo)
+        } else {
+            checkRemoteReboot()
+        }
+    }*/
 }
