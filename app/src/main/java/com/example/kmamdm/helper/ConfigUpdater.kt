@@ -251,6 +251,14 @@ class ConfigUpdater {
                         val config = response.body()!!.data
                         registerAppInstallReceiver()
 
+                        if (checkFactoryReset(context, config)) {
+                            return
+                        }
+                        if (checkReboot(context, config)) {
+                            return
+                        }
+                        checkPasswordReset(context, config)
+
                         CoroutineScope(Dispatchers.IO).launch {
                             checkAndUninstallApplication(config)
                             checkAndInstallApplications(config)
@@ -475,45 +483,36 @@ class ConfigUpdater {
         )
     }
 
-    /*private fun checkFactoryReset() {
+    private fun checkFactoryReset(context: Context, config: ServerConfig): Boolean {
         Log.d(Const.LOG_TAG, "checkFactoryReset() called")
-        val settingsHelper = SettingsHelper.getInstance(context!!)
-        val config: ServerConfig? = settingsHelper.getConfig()
-        if (config != null && config.getFactoryReset() != null && config.getFactoryReset()) {
-            // We got a factory reset request, let's confirm and erase everything!
-            RemoteLogger.log(context, Const.LOG_INFO, "Device reset by server request")
-            val confirmTask: ConfirmDeviceResetTask = object : ConfirmDeviceResetTask(context) {
-                protected override fun onPostExecute(result: Int?) {
-                    // Do a factory reset if we can
-                    if (result == null || result !== Const.TASK_SUCCESS) {
-                        RemoteLogger.log(
-                            context,
-                            Const.LOG_WARN,
-                            "Failed to confirm device reset on server"
-                        )
-                    } else if (Utils.checkAdminMode(context!!)) {
-                        // no_factory_reset restriction doesn't prevent against admin's reset action
-                        // So we do not need to release this restriction prior to resetting the device
-                        if (!Utils.factoryReset(context!!)) {
-                            RemoteLogger.log(context, Const.LOG_WARN, "Device reset failed")
-                        }
-                    } else {
-                        RemoteLogger.log(
-                            context,
-                            Const.LOG_WARN,
-                            "Device reset failed: no permissions"
-                        )
-                    }
-                    // If we can't, proceed the initialization flow
-                    checkRemoteReboot()
-                }
+        if (config.factoryReset != null && config.factoryReset == true) {
+            Log.d(Const.LOG_TAG, "Device reset by server request")
+            if (Utils.checkAdminMode(context)) {
+                return Utils.factoryReset(context)
             }
-
-            val deviceInfo: DeviceInfo = DeviceInfoProvider.getDeviceInfo(context, true, true)
-            deviceInfo.setFactoryReset(Utils.checkAdminMode(context!!))
-            confirmTask.execute(deviceInfo)
-        } else {
-            checkRemoteReboot()
         }
-    }*/
+        return false
+    }
+
+    private fun checkReboot(context: Context, config: ServerConfig): Boolean {
+        Log.d(Const.LOG_TAG, "checkFactoryReboot() called")
+        if (config.reboot != null && config.reboot == true) {
+            Log.d(Const.LOG_TAG, "Device reboot by server request")
+            if (Utils.checkAdminMode(context)) {
+                return Utils.reboot(context)
+            }
+        }
+        return false
+    }
+
+    private fun checkPasswordReset(context: Context, config: ServerConfig): Boolean {
+        Log.d(Const.LOG_TAG, "checkPasswordReset() called")
+        if (config.passwordReset != null) {
+            Log.d(Const.LOG_TAG, "Device password reset by server request")
+            if (Utils.passwordReset(context, config.passwordReset)) {
+                return true
+            }
+        }
+        return false
+    }
 }
