@@ -73,6 +73,19 @@ class SettingsHelper(context: Context) {
             .commit()
     }
 
+    fun setDeviceIdUse(deviceIdUse: String?): Boolean {
+        return if (deviceIdUse == null) {
+            sharedPreferences.edit().remove(PACKAGE_NAME + PREF_KEY_DEVICE_ID_USE).commit()
+        } else {
+            sharedPreferences.edit().putString(PACKAGE_NAME + PREF_KEY_DEVICE_ID_USE, deviceIdUse)
+                .commit()
+        }
+    }
+
+    fun getDeviceIdUse(): String? {
+        return sharedPreferences.getString(PACKAGE_NAME + PREF_KEY_DEVICE_ID_USE, null)
+    }
+
     fun getConfigUpdateTimestamp(): Long {
         return sharedPreferences.getLong(PACKAGE_NAME + PREF_CFG_UPDATE_TIMESTAMP, 0)
     }
@@ -99,6 +112,27 @@ class SettingsHelper(context: Context) {
     fun setQrProvisioning(value: Boolean): Boolean {
         return sharedPreferences.edit().putBoolean(PACKAGE_NAME + PREF_QR_PROVISIONING, value)
             .commit()
+    }
+
+    fun setAppStartTime(time: Long): Boolean {
+        return sharedPreferences.edit().putLong(PACKAGE_NAME + PREF_KEY_APP_START_TIME, time)
+            .commit()
+    }
+
+    fun getAppStartTime(): Long {
+        return sharedPreferences.getLong(PACKAGE_NAME + PREF_KEY_APP_START_TIME, 0)
+    }
+
+    fun isIntegratedProvisioningFlow(): Boolean {
+        return sharedPreferences.getBoolean(
+            PACKAGE_NAME + PREF_KEY_INTEGRATED_PROVISIONING_FLOW,
+            false
+        )
+    }
+
+    fun setIntegratedProvisioningFlow(value: Boolean): Boolean {
+        return sharedPreferences.edit()
+            .putBoolean(PACKAGE_NAME + PREF_KEY_INTEGRATED_PROVISIONING_FLOW, value).commit()
     }
 
     companion object {

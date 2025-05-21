@@ -9,4 +9,10 @@
     <style name="BaseDialog" parent="Theme.AppCompat.Light.Dialog.Alert">
         <item name="android:windowBackground">@android:color/transparent</item>
     </style>
+
+    <style name="SetupWizardTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/wizardPrimary</item>
+        <item name="colorPrimaryDark">@color/wizardPrimaryDark</item>
+        <item name="colorAccent">@color/wizardAccent</item>
+    </style>
 </resources>

@@ -148,7 +148,7 @@ object Const {
     
     val QR_SERVER_PROJECT_ATTR: String = "com.hmdm.SERVER_PROJECT"
     
-    val QR_DEVICE_ID_ATTR: String = "com.hmdm.DEVICE_ID"
+    val QR_DEVICE_ID_ATTR: String = "DEVICE_ID"
     
     val QR_LEGACY_DEVICE_ID_ATTR: String = "ru.headwind.kiosk.DEVICE_ID"
     

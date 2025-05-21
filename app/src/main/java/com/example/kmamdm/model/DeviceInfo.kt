@@ -18,5 +18,12 @@ data class DeviceInfo(
     @SerializedName("cpuArch") val cpuArch: String,
     @SerializedName("cpuCores") val cpuCores: Int,
     @SerializedName("totalRAM") val totalRAM: Long,
-    @SerializedName("totalStorage") val totalStorage: Long
+    @SerializedName("totalStorage") val totalStorage: Long,
+
+    @SerializedName("fullScreenWidth") val fullScreenWidth: Int,
+    @SerializedName("fullScreenHeight") val fullScreenHeight: Int,
+    @SerializedName("displayScreenWidth") val displayScreenWidth: Int,
+    @SerializedName("displayScreenHeight") val displayScreenHeight: Int,
+    @SerializedName("statusBarHeight") val statusBarHeight: Int,
+    @SerializedName("navigationBarHeight") val navigationBarHeight: Int,
 )

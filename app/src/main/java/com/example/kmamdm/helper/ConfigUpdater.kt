@@ -17,7 +17,6 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.kmamdm.BuildConfig
 import com.example.kmamdm.model.Application
 import com.example.kmamdm.model.ApplicationConfig
-import com.example.kmamdm.model.DeviceInfo
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.server.json.ServerConfigResponse
 import com.example.kmamdm.server.repository.ConfigurationRepository
@@ -67,6 +66,8 @@ class ConfigUpdater {
     private var conditionVariable = ConditionVariable()
     private val applicationsForRun = mutableListOf<Application>()
 
+    private var loadOnly = false
+
     companion object {
         fun notifyConfigUpdate(context: Context) {
             if (SettingsHelper.getInstance(context).isMainActivityRunning()) {
@@ -81,6 +82,10 @@ class ConfigUpdater {
         fun forceConfigUpdate(context: Context, notifier: UINotifier?, userInteraction: Boolean) {
             ConfigUpdater().updateConfig(context, notifier, userInteraction)
         }
+    }
+
+    fun setLoadOnly(loadOnly: Boolean) {
+        this.loadOnly = loadOnly
     }
 
     private fun registerAppInstallReceiver() {
@@ -240,6 +245,14 @@ class ConfigUpdater {
                         // set self permissions
                         if (Utils.isDeviceOwner(context)) {
                             setSelfPermissions()
+                        }
+
+                        if (loadOnly) {
+                            if (response.body()?.data != null) {
+                                SettingsHelper.getInstance(context).updateConfig(response.body()!!.data)
+                            }
+                            uiNotifier?.onConfigLoaded()
+                            return
                         }
 
                         // connect socket

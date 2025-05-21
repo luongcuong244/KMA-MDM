@@ -13,7 +13,10 @@ import android.os.Environment
 import android.os.StatFs
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import android.util.DisplayMetrics
 import android.util.Log
+import android.util.Size
+import android.view.WindowManager
 import com.example.kmamdm.model.DeviceInfo
 import com.example.kmamdm.socket.json.DeviceStatus
 
@@ -57,7 +60,13 @@ object DeviceUtils {
             cpuArch = cpuArch,
             cpuCores = cpuCores,
             totalRAM = totalRAM,
-            totalStorage = totalStorage
+            totalStorage = totalStorage,
+            fullScreenWidth = getFullScreenSize(context).width,
+            fullScreenHeight = getFullScreenSize(context).height,
+            displayScreenWidth = getDisplayScreenSize(context).width,
+            displayScreenHeight = getDisplayScreenSize(context).height,
+            statusBarHeight = getStatusBarHeight(context),
+            navigationBarHeight = getNavigationBarHeight(context)
         )
         return deviceInfo!!
     }
@@ -191,5 +200,55 @@ object DeviceUtils {
             }
         }
         return "Unknown"
+    }
+
+    private fun getFullScreenSize(context: Context): Size {
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val width: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowMetrics = windowManager.currentWindowMetrics
+            windowMetrics.bounds.width()
+        } else {
+            val displayMetrics = DisplayMetrics()
+            windowManager.defaultDisplay.getMetrics(displayMetrics);
+            displayMetrics.widthPixels
+        }
+        val height: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val windowMetrics = windowManager.currentWindowMetrics
+            windowMetrics.bounds.height()
+        } else {
+            val displayMetrics = DisplayMetrics()
+            windowManager.defaultDisplay.getMetrics(displayMetrics);
+            displayMetrics.heightPixels
+        }
+        Log.d("SingleActivity", "Full screen size: $width x $height")
+        return Size(width, height)
+    }
+
+    private fun getDisplayScreenSize(context: Context): Size {
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val displayMetrics = DisplayMetrics()
+        windowManager.defaultDisplay.getMetrics(displayMetrics)
+        val displayHeight = displayMetrics.heightPixels
+        val displayWidth = displayMetrics.widthPixels
+        Log.d("SingleActivity", "Display screen size: $displayWidth x $displayHeight")
+        return Size(displayWidth, displayHeight)
+    }
+
+    private fun getStatusBarHeight(context: Context): Int {
+        val statusBarResourceId: Int = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (statusBarResourceId > 0) {
+            context.resources.getDimensionPixelSize(statusBarResourceId)
+        } else {
+            0
+        }
+    }
+
+    private fun getNavigationBarHeight(context: Context): Int {
+        val resourceId: Int = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (resourceId > 0) {
+            context.resources.getDimensionPixelSize(resourceId)
+        } else {
+            0
+        }
     }
 }
