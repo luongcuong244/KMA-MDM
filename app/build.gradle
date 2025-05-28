@@ -11,13 +11,15 @@ android {
         applicationId "com.example.kmamdm"
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode 100
+        versionName "1.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // A shared secret to sign server config requests
         buildConfigField("String", "REQUEST_SIGNATURE", "\"khoa_bi_mat_giua_mobile_and_server\"")
+
+        setProperty("archivesBaseName", "KMA_MDM_v$versionCode($versionName)")
     }
 
     buildTypes {
