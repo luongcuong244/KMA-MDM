@@ -8,7 +8,10 @@ import com.example.kmamdm.server.json.ServerConfigResponse
 import retrofit2.Callback
 
 object ConfigurationRepository {
-    private val configurationApi : ConfigurationApi = RetrofitClient.getClient().create(ConfigurationApi::class.java)
+
+    private fun getApi(): ConfigurationApi {
+        return RetrofitClient.getClient().create(ConfigurationApi::class.java)
+    }
 
     fun getServerConfig(
         signature: String,
@@ -17,6 +20,6 @@ object ConfigurationRepository {
         callback: Callback<ServerConfigResponse>
     ) {
         val request = GetServerConfigRequest(signature, deviceId, deviceInfo)
-        configurationApi.getServerConfig(request).enqueue(callback)
+        getApi().getServerConfig(request).enqueue(callback)
     }
 }

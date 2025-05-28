@@ -33,6 +33,7 @@
             android:textColor="#0027FF" />
 
         <TextView
+            android:id="@+id/deviceIdPrompt"
             android:layout_width="@dimen/dialog_enter_device_id_width"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"

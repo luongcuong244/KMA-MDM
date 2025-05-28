@@ -63,7 +63,6 @@ import com.example.kmamdm.ui.adapter.BaseAppListAdapter
 import com.example.kmamdm.ui.adapter.MainAppListAdapter
 import com.example.kmamdm.ui.dialog.AdministratorModeDialog
 import com.example.kmamdm.ui.dialog.DownloadAndInstallAppDialog
-import com.example.kmamdm.ui.dialog.EnterDeviceIdDialog
 import com.example.kmamdm.ui.dialog.ManageStorageDialog
 import com.example.kmamdm.ui.dialog.NetworkErrorDialog
 import com.example.kmamdm.ui.dialog.OverlaySettingsDialog
@@ -77,7 +76,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.system.exitProcess
 
 
 class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.OnClickListener,
@@ -474,9 +472,34 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     private fun startLauncher() {
-        if (!configInitialized) {
+        val settingsHelper = SettingsHelper.getInstance(this)
+        if (!settingsHelper.isBaseUrlSet()) {
+            // For common public version, here's an option to change the server
+            createAndShowEnterServerUrlDialog {
+                checkAndStartLauncher()
+            }
+        } else if (settingsHelper.getDeviceId() == null || settingsHelper.getDeviceId()!!.isEmpty()) {
+            Log.d(Const.LOG_TAG, "Device ID is empty")
+            createAndShowEnterDeviceDialog {
+                settingsHelper.setDeviceId(it)
+                updateConfig(true)
+            }
+        } else if (!configInitialized) {
             Log.i(Const.LOG_TAG, "Updating configuration in startLauncher()")
-            updateConfig(true)
+            var userInteraction = true
+            val integratedProvisioningFlow = settingsHelper.isIntegratedProvisioningFlow()
+            if (integratedProvisioningFlow) {
+                // InitialSetupActivity just started and this is the first start after
+                // the admin integrated provisioning flow, we need to show the process of loading apps
+                // Notice the config is not null because it's preloaded in InitialSetupActivity
+                settingsHelper.setIntegratedProvisioningFlow(false)
+            }
+            if (settingsHelper.getConfig() != null && !integratedProvisioningFlow) {
+                // If it's not the first start, let's update in the background, show the content first!
+                showContent()
+                userInteraction = false
+            }
+            updateConfig(userInteraction)
         } else {
             showContent()
         }
@@ -625,26 +648,10 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     override fun onConfigUpdateServerError(errorText: String?) {
         networkErrorDetails = errorText
         Log.d(Const.LOG_TAG, "Server error: $errorText")
-        enterDeviceIdDialog = EnterDeviceIdDialog(
-            error = true,
-            deviceID = SettingsHelper.getInstance(this).getDeviceId(),
-            onClickExit = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    finishAffinity()
-                }
-                exitProcess(0)
-            },
-            onClickSave = {
-                if (it.isNotEmpty()) {
-                    SettingsHelper.getInstance(this).setDeviceId(it)
-                    updateConfig(true)
-                }
-            },
-            onClickDetails = {
-                showErrorDetails()
-            },
-        )
-        enterDeviceIdDialog?.show(supportFragmentManager,  "EnterDeviceIdDialog")
+        createAndShowEnterDeviceDialog {
+            SettingsHelper.getInstance(this).setDeviceId(it)
+            updateConfig(true)
+        }
     }
 
     override fun onConfigUpdateNetworkError(errorText: String?) {
@@ -655,6 +662,9 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             startActivity(restoreLauncherIntent)
         }
         val settingsHelper = SettingsHelper.getInstance(this)
+
+        Log.d(Const.LOG_TAG, "Network error: $errorText")
+
         // show error dialog
         networkErrorDetails = errorText
         networkErrorDialog = NetworkErrorDialog(
@@ -662,6 +672,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
             showWifiButton = settingsHelper.getConfig() == null,
             onClickRetry = {
                 updateConfig(true)
+            },
+            onClickReset = {
+                settingsHelper.setDeviceId("")
+                settingsHelper.setBaseUrl("")
+                createAndShowEnterServerUrlDialog {
+                    checkAndStartLauncher()
+                }
             },
             onClickWifi = {
 //                if (KioskUtils.isKioskModeRunning(this)) {

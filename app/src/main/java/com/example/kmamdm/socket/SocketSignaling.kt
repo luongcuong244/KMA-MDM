@@ -47,7 +47,9 @@ class SocketSignaling(
             .setReconnection(false) //On Socket.EVENT_DISCONNECT or Socket.EVENT_CONNECT_ERROR or Event.SOCKET_ERROR. Auto or User reconnect
             .setAuth(mapOf(Payload.WEB_SOCKET_AUTH_TOKEN to deviceID)).build()
 
-        socket = IO.socket(ServerAddress.SERVER_ADDRESS, options).apply {
+        val serverUrl = SettingsHelper.getInstanceOrNull()?.getBaseUrl() ?: ServerAddress.SERVER_ADDRESS
+
+        socket = IO.socket(serverUrl, options).apply {
             on(Socket.EVENT_CONNECT) {
                 eventListener.onSocketConnected()
             }

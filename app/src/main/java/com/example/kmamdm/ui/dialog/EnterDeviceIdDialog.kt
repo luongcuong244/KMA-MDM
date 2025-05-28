@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.fragment.app.DialogFragment
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.DialogEnterDeviceIdBinding
+import com.example.kmamdm.helper.SettingsHelper
 
 class EnterDeviceIdDialog(
     private val error: Boolean,
@@ -23,6 +24,11 @@ class EnterDeviceIdDialog(
         setStyle(STYLE_NORMAL, R.style.BaseDialog)
         isCancelable = false
         binding = DialogEnterDeviceIdBinding.inflate(layoutInflater)
+
+        val serverUrl = context?.let { SettingsHelper.getInstance(it).getBaseUrl() }
+        serverUrl?.let {
+            binding.deviceIdPrompt.text = "Enter the Device ID at: $it"
+        }
 
         if (!error) {
             binding.tvError.visibility = View.GONE

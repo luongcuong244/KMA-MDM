@@ -7,10 +7,12 @@ import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
 import com.example.kmamdm.R
 import com.example.kmamdm.databinding.DialogNetworkErrorrBinding
+import com.example.kmamdm.helper.SettingsHelper
 
 class NetworkErrorDialog(
     private val showWifiButton: Boolean,
     private val onClickRetry: () -> Unit,
+    private val onClickReset: () -> Unit,
     private val onClickWifi: () -> Unit,
     private val onClickCancel: () -> Unit,
     private val onClickDetails: () -> Unit,
@@ -23,6 +25,10 @@ class NetworkErrorDialog(
         isCancelable = false
         binding = DialogNetworkErrorrBinding.inflate(layoutInflater)
 
+        context?.let {
+            binding.tvError.text = "Error connecting to: ${SettingsHelper.getInstance(it).getBaseUrl()}. Please check your network connection."
+        }
+
         if (showWifiButton) {
             binding.btnWifi.visibility = View.VISIBLE
         } else {
@@ -32,6 +38,10 @@ class NetworkErrorDialog(
         binding.btnRetry.setOnClickListener {
             dismiss()
             onClickRetry()
+        }
+        binding.btnReset.setOnClickListener {
+            dismiss()
+            onClickReset()
         }
         binding.btnWifi.setOnClickListener {
             dismiss()

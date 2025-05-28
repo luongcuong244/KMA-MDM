@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.ContextWrapper
+import android.widget.Toast
 
 fun Context.showDialog(
     title: String,
@@ -45,4 +46,8 @@ fun Context.findActivity(): Activity? {
         context = context.baseContext
     }
     return null
+}
+
+fun Context.showToast(message: String) {
+    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }

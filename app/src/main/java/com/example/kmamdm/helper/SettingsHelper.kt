@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.kmamdm.model.ApplicationSetting
 import com.example.kmamdm.model.ServerConfig
+import com.example.kmamdm.server.ServerAddress
 import com.google.gson.Gson
 
 class SettingsHelper(context: Context) {
@@ -61,6 +62,19 @@ class SettingsHelper(context: Context) {
     fun setKioskModeRunning(isRunning: Boolean) {
         sharedPreferences.edit()
             .putBoolean(PACKAGE_NAME + PREF_KEY_KIOSK_MODE_RUNNING, isRunning)
+            .commit()
+    }
+
+    fun isBaseUrlSet(): Boolean {
+        return sharedPreferences.getString(PACKAGE_NAME + PREF_KEY_BASE_URL, null) != null
+    }
+
+    fun getBaseUrl(): String {
+        return sharedPreferences.getString(PACKAGE_NAME + PREF_KEY_BASE_URL, null) ?: ServerAddress.SERVER_ADDRESS
+    }
+
+    fun setBaseUrl(baseUrl: String?): Boolean {
+        return sharedPreferences.edit().putString(PACKAGE_NAME + PREF_KEY_BASE_URL, baseUrl)
             .commit()
     }
 
@@ -170,6 +184,10 @@ class SettingsHelper(context: Context) {
             }
 
             return instance!!
+        }
+
+        fun getInstanceOrNull(): SettingsHelper? {
+            return instance
         }
     }
 }

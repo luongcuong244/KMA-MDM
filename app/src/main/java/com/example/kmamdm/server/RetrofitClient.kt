@@ -1,6 +1,7 @@
 package com.example.kmamdm.server
 
 import android.util.Log
+import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.utils.SharePrefUtils
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
@@ -13,15 +14,20 @@ class RetrofitClient {
     companion object {
 
         private var retrofit: Retrofit? = null
+        private var currentBaseUrl: String? = null
 
         fun getClient(): Retrofit {
-            if (retrofit == null) {
-                createClient()
+            val savedUrl =
+                SettingsHelper.getInstanceOrNull()?.getBaseUrl() ?: ServerAddress.SERVER_ADDRESS
+
+            if (retrofit == null || savedUrl != currentBaseUrl) {
+                createClient(savedUrl)
             }
+
             return retrofit!!
         }
 
-        private fun createClient() {
+        private fun createClient(baseUrl: String) {
             val httpClient = setupOkHttpClient()
 
             val gson = GsonBuilder()
@@ -29,13 +35,13 @@ class RetrofitClient {
                 .create()
 
             retrofit = Retrofit.Builder()
-                .baseUrl(ServerAddress.SERVER_ADDRESS)
+                .baseUrl(baseUrl)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .client(httpClient)
                 .build()
         }
 
-        private fun setupOkHttpClient() : OkHttpClient {
+        private fun setupOkHttpClient(): OkHttpClient {
             val httpClient = OkHttpClient.Builder()
 
             httpClient.addInterceptor { chain ->
