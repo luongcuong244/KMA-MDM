@@ -46,10 +46,10 @@ class PushNotificationWorker(
 
     companion object {
         // Minimal interval is 15 minutes as per docs
-        private const val FIRE_PERIOD_MINS: Long = 1L
+        private const val FIRE_PERIOD_MINS: Long = 15L
 
         // Interval to update configuration to avoid losing device due to push failure
-        const val CONFIG_UPDATE_INTERVAL: Long = 3600000L
+        const val CONFIG_UPDATE_INTERVAL: Long = 15 * 60 * 1000 // 15 minutes
 
         private const val WORK_TAG_PERIODIC = "WORK_TAG_PUSH_PERIODIC"
 

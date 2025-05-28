@@ -1,7 +1,6 @@
 package com.example.kmamdm.socket.json
 
 import com.google.gson.annotations.SerializedName
-import org.json.JSONObject
 
 data class PushMessage(
     @SerializedName("_id") val id: String,

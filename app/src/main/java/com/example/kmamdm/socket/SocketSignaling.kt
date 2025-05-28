@@ -69,18 +69,22 @@ class SocketSignaling(
                 eventListener.onReceiveViewDeviceStatus(webSocketId)
             }
             on(Event.MOBILE_RECEIVE_PUSH_MESSAGES) { args ->
-                val jsonObject = args?.firstOrNull() as? JSONObject ?: JSONObject()
+                try {
+                    val jsonObject = args?.firstOrNull() as? JSONObject ?: return@on
 
-                val webSocketId = jsonObject.optString(Payload.WEB_SOCKET_ID, "")
-                val messagesJsonArray = jsonObject.optJSONArray(Payload.MESSAGES)
+                    val webSocketId = jsonObject.optString(Payload.WEB_SOCKET_ID, "")
+                    val messagesJsonArray = jsonObject.optJSONArray(Payload.MESSAGES)
 
-                val messages: List<PushMessage> = if (messagesJsonArray != null) {
-                    Gson().fromJson(messagesJsonArray.toString(), Array<PushMessage>::class.java).toList()
-                } else {
-                    emptyList()
+                    val messages: List<PushMessage> = if (messagesJsonArray != null) {
+                        Gson().fromJson(messagesJsonArray.toString(), Array<PushMessage>::class.java).toList()
+                    } else {
+                        emptyList()
+                    }
+
+                    eventListener.onReceivePushMessages(webSocketId, messages)
+                } catch (e: Exception) {
+                    Log.e("SocketSignaling", "Error parsing push messages: ${e.message}", e)
                 }
-
-                eventListener.onReceivePushMessages(webSocketId, messages)
             }
             open()
         }
