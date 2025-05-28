@@ -142,7 +142,7 @@ object Const {
     val APUPPET_SERVICE_CLASS_NAME: String = "com.hmdm.control.GestureDispatchService"
 
     
-    val QR_BASE_URL_ATTR: String = "com.hmdm.BASE_URL"
+    val QR_BASE_URL_ATTR: String = "BASE_URL"
     
     val QR_SECONDARY_BASE_URL_ATTR: String = "com.hmdm.SECONDARY_BASE_URL"
     

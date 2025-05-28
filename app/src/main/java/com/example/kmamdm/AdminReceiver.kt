@@ -75,20 +75,16 @@ class AdminReceiver : DeviceAdminReceiver() {
                 var serverProject: String? = null
                 // val createOptions: DeviceCreateOptions = DeviceCreateOptions()
                 if (bundle != null) {
-//                    baseUrl = bundle.getString(Const.QR_BASE_URL_ATTR, null)
+                    baseUrl = bundle.getString(Const.QR_BASE_URL_ATTR, null)
 //                    secondaryBaseUrl = bundle.getString(Const.QR_SECONDARY_BASE_URL_ATTR, null)
 //                    serverProject = bundle.getString(Const.QR_SERVER_PROJECT_ATTR, null)
 //                    createOptions.setCustomer(bundle.getString(Const.QR_CUSTOMER_ATTR, null))
 //                    createOptions.setConfiguration(bundle.getString(Const.QR_CONFIG_ATTR, null))
 //                    createOptions.setGroups(bundle.getString(Const.QR_GROUP_ATTR, null))
-//                    if (baseUrl != null) {
-//                        PreferenceLogger.log(preferences, "BaseURL: $baseUrl")
-//                        settingsHelper.setBaseUrl(baseUrl)
-//                        // If we don't set the secondary base URL, it will point to app.h-mdm.com by default which is wrong
-//                        if (secondaryBaseUrl == null) {
-//                            secondaryBaseUrl = baseUrl
-//                        }
-//                    }
+                    if (baseUrl != null) {
+                        PreferenceLogger.log(preferences, "BaseURL: $baseUrl")
+                        settingsHelper.setBaseUrl(baseUrl)
+                    }
 //                    if (secondaryBaseUrl != null) {
 //                        PreferenceLogger.log(preferences, "SecondaryBaseURL: $secondaryBaseUrl")
 //                        settingsHelper.setSecondaryBaseUrl(secondaryBaseUrl)
