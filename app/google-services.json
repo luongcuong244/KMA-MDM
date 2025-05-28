@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "436907392114",
+    "project_id": "kma-mdm",
+    "storage_bucket": "kma-mdm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:436907392114:android:214fd9873bca71b83496eb",
+        "android_client_info": {
+          "package_name": "com.example.kmamdm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5qrzEGf2nUs_R6uv8QHrDEJu4Im4iS9A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
