@@ -22,6 +22,7 @@ class SocketSignaling(
         fun onError(error: String)
         fun onReceiveViewDeviceStatus(webSocketId: String)
         fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>)
+        fun onReceiveRequestRemoteControl(webSocketId: String)
     }
 
     private object Event {
@@ -30,6 +31,8 @@ class SocketSignaling(
         const val MOBILE_SEND_DEVICE_STATUS = "mobile:send:device_status"
         const val MOBILE_RECEIVE_PUSH_MESSAGES = "mobile:receive:push_messages"
         const val MOBILE_SEND_PUSH_MESSAGES = "mobile:send:push_messages"
+        const val MOBILE_RECEIVE_REQUEST_REMOTE_CONTROL = "mobile:receive:request_remote_control"
+        const val MOBILE_SEND_ACCEPT_REMOTE_CONTROL = "mobile:send:accept_remote_control"
     }
 
     private object Payload {
@@ -39,6 +42,8 @@ class SocketSignaling(
         const val WEB_SOCKET_ID = "webSocketId"
         const val DEVICE_STATUS = "deviceStatus"
         const val MESSAGES = "messages"
+        const val DEVICE_ID = "deviceId"
+        const val ERROR_MESSAGE = "errorMessage"
     }
 
     fun openSocket(context: Context) {
@@ -86,6 +91,10 @@ class SocketSignaling(
                     Log.e("SocketSignaling", "Error parsing push messages: ${e.message}", e)
                 }
             }
+            on(Event.MOBILE_RECEIVE_REQUEST_REMOTE_CONTROL) { args ->
+                val webSocketId = (args?.firstOrNull() as? JSONObject)?.optString(Payload.WEB_SOCKET_ID) ?: ""
+                eventListener.onReceiveRequestRemoteControl(webSocketId)
+            }
             open()
         }
     }
@@ -104,6 +113,16 @@ class SocketSignaling(
         jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
         jsonObject.put(Payload.MESSAGES, gson.toJson(messages))
         socket?.emit(Event.MOBILE_SEND_PUSH_MESSAGES, jsonObject)
+    }
+
+    fun sendAcceptRemoteControl(webSocketId: String, deviceId: String, errorMessage: String? = null) {
+        val jsonObject = JSONObject()
+        jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
+        jsonObject.put(Payload.DEVICE_ID, deviceId)
+        if (errorMessage != null) {
+            jsonObject.put(Payload.ERROR_MESSAGE, errorMessage)
+        }
+        socket?.emit(Event.MOBILE_SEND_ACCEPT_REMOTE_CONTROL, jsonObject)
     }
 
     fun destroy() {

@@ -137,9 +137,9 @@ object Const {
     
     val KIOSK_BROWSER_PACKAGE_NAME: String = "com.hmdm.kiosk"
     
-    val APUPPET_PACKAGE_NAME: String = "com.hmdm.control"
+    val APUPPET_PACKAGE_NAME: String = "info.dvkr.screenstream.dev"
     
-    val APUPPET_SERVICE_CLASS_NAME: String = "com.hmdm.control.GestureDispatchService"
+    val APUPPET_SERVICE_CLASS_NAME: String = "info.dvkr.screenstream.webrtc.RemoteAccessibilityService"
 
     
     val QR_BASE_URL_ATTR: String = "BASE_URL"
