@@ -12,6 +12,7 @@ import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.location.LocationManager
@@ -24,6 +25,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Surface
 import android.view.View
@@ -33,6 +35,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.RelativeLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.databinding.DataBindingUtil
@@ -109,6 +112,8 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 
     private val REQUEST_CODE_GPS_STATE_CHANGE = 1
     private var isBackground = false
+
+    private var lockScreen: View? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(p0: Context?, intent: Intent?) {
@@ -505,6 +510,54 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         }
     }
 
+    private fun createLockScreen() {
+        if (lockScreen != null) {
+            return
+        }
+
+        val manager = (applicationContext.getSystemService(WINDOW_SERVICE) as WindowManager)
+
+        // Reuse existing "Application not allowed" screen but hide buttons
+        lockScreen =
+            LayoutInflater.from(this).inflate(R.layout.layout_application_not_allowed, null)
+        lockScreen!!.findViewById<View>(R.id.layout_application_not_allowed_continue).visibility =
+            View.GONE
+        lockScreen!!.findViewById<View>(R.id.layout_application_not_allowed_admin).visibility = View.GONE
+        lockScreen!!.findViewById<View>(R.id.package_id).visibility = View.GONE
+        lockScreen!!.findViewById<View>(R.id.message2).visibility = View.GONE
+        val textView: TextView = lockScreen!!.findViewById<TextView>(R.id.message)
+        textView.text =
+            getString(R.string.device_locked, SettingsHelper.getInstance(this).getDeviceId())
+
+        lockScreen?.visibility = View.GONE
+
+        try {
+            manager.addView(lockScreen, overlayLockScreenParams())
+        } catch (e: java.lang.Exception) {
+            // No permission to show overlays; let's try to add view to main view
+            try {
+                val root: RelativeLayout = findViewById(R.id.activity_main)
+                root.addView(lockScreen)
+            } catch (e1: java.lang.Exception) {
+                e1.printStackTrace()
+            }
+        }
+    }
+
+    private fun overlayLockScreenParams(): WindowManager.LayoutParams {
+        val layoutParams = WindowManager.LayoutParams()
+        layoutParams.type = Utils.overlayWindowType()
+        layoutParams.gravity = Gravity.RIGHT
+        layoutParams.flags =
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+
+        layoutParams.height = WindowManager.LayoutParams.MATCH_PARENT
+        layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT
+        layoutParams.format = PixelFormat.TRANSPARENT
+
+        return layoutParams
+    }
+
     private fun createButtons() {
         val config = SettingsHelper.getInstance(this).getConfig()
         if (config?.kioskMode == true && config.kioskApps.isNotEmpty()) {
@@ -818,6 +871,13 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
         createButtons()
 
         scheduleInstalledAppsRun()
+
+        if (config.lock != null && config.lock == true) {
+            showLockScreen()
+            return
+        } else {
+            hideLockScreen()
+        }
 
         if (orientationLocked) {
             Utils.setOrientation(this, config)
@@ -1205,6 +1265,27 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
 //            )
 //        }
         return true
+    }
+
+    private fun showLockScreen() {
+        if (lockScreen == null) {
+            createLockScreen()
+            if (lockScreen == null) {
+                // Why cannot we create the lock screen? Give up and return
+                // The locked device will show the launcher, but still cannot run any application
+                return
+            }
+        }
+        val settingsHelper = SettingsHelper.getInstance(this)
+        val textView: TextView = lockScreen!!.findViewById(R.id.message)
+        textView.text = "Thiết bị đã bị khóa. ${settingsHelper.getConfig()?.lockMessage ?: ""}"
+        lockScreen!!.visibility = View.VISIBLE
+    }
+
+    private fun hideLockScreen() {
+        if (lockScreen != null && lockScreen?.visibility == View.VISIBLE) {
+            lockScreen?.visibility = View.GONE
+        }
     }
 
     companion object {

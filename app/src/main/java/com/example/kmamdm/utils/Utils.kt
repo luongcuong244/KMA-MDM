@@ -19,6 +19,7 @@ import android.os.UserManager
 import android.provider.Settings
 import android.provider.Settings.SettingNotFoundException
 import android.util.Log
+import android.view.WindowManager
 import com.example.kmamdm.model.ServerConfig
 import com.example.kmamdm.ui.screen.main.MainActivity
 import java.util.UUID
@@ -649,5 +650,14 @@ object Utils {
                 .commit()
         }
         return token
+    }
+
+    fun overlayWindowType(): Int {
+        // https://stackoverflow.com/questions/45867533/system-alert-window-permission-on-api-26-not-working-as-expected-permission-den
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
+        }
     }
 }

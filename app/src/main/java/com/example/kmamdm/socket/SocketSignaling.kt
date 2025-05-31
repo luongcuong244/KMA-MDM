@@ -8,6 +8,7 @@ import com.example.kmamdm.socket.json.DeviceStatus
 import com.example.kmamdm.socket.json.PushMessage
 import com.google.gson.Gson
 import io.socket.client.IO
+import io.socket.client.On.on
 import io.socket.client.Socket
 import org.json.JSONObject
 
@@ -49,7 +50,7 @@ class SocketSignaling(
     fun openSocket(context: Context) {
         val deviceID = SettingsHelper.getInstance(context).getDeviceId()
         val options = IO.Options.builder()
-            .setReconnection(false) //On Socket.EVENT_DISCONNECT or Socket.EVENT_CONNECT_ERROR or Event.SOCKET_ERROR. Auto or User reconnect
+            .setReconnection(true) //On Socket.EVENT_DISCONNECT or Socket.EVENT_CONNECT_ERROR or Event.SOCKET_ERROR. Auto or User reconnect
             .setAuth(mapOf(Payload.WEB_SOCKET_AUTH_TOKEN to deviceID)).build()
 
         val serverUrl = SettingsHelper.getInstanceOrNull()?.getBaseUrl() ?: ServerAddress.SERVER_ADDRESS
