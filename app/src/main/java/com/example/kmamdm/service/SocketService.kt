@@ -21,6 +21,7 @@ import com.example.kmamdm.R
 import com.example.kmamdm.helper.SettingsHelper
 import com.example.kmamdm.socket.SocketManager
 import com.example.kmamdm.socket.SocketSignaling
+import com.example.kmamdm.socket.json.DeviceStatus
 import com.example.kmamdm.socket.json.PushMessage
 import com.example.kmamdm.utils.Const
 import com.example.kmamdm.utils.DeviceUtils
@@ -62,9 +63,9 @@ class SocketService : Service() {
                 )
             }
 
-            override fun onReceiveViewDeviceStatus(webSocketId: String) {
+            override fun onReceiveViewDeviceStatus(): DeviceStatus {
                 val deviceStatus = DeviceUtils.getDeviceStatus(this@SocketService)
-                SocketManager.get().sendDeviceStatus(webSocketId, deviceStatus)
+                return deviceStatus
             }
 
             override fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>) {
