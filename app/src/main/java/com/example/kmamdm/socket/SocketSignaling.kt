@@ -9,9 +9,7 @@ import com.example.kmamdm.socket.json.PushMessage
 import com.google.gson.Gson
 import io.socket.client.Ack
 import io.socket.client.IO
-import io.socket.client.On.on
 import io.socket.client.Socket
-import org.json.JSONException
 import org.json.JSONObject
 
 class SocketSignaling(
@@ -90,21 +88,35 @@ class SocketSignaling(
                 payload.sendOkAck(jsonObject)
             }
             on(Event.MOBILE_RECEIVE_PUSH_MESSAGES) { args ->
+                val payload = SocketPayload.fromPayload(args)
                 try {
-                    val jsonObject = args?.firstOrNull() as? JSONObject ?: return@on
+                    val webSocketId = payload.json?.optString(Payload.WEB_SOCKET_ID, "")
+                    val messagesJsonArray = payload.json?.optJSONArray(Payload.MESSAGES)
 
-                    val webSocketId = jsonObject.optString(Payload.WEB_SOCKET_ID, "")
-                    val messagesJsonArray = jsonObject.optJSONArray(Payload.MESSAGES)
+                    if (webSocketId.isNullOrEmpty()) {
+                        payload.sendErrorAck("WebSocket ID is missing")
+                        return@on
+                    }
 
-                    val messages: List<PushMessage> = if (messagesJsonArray != null) {
+                    if (messagesJsonArray == null) {
+                        payload.sendErrorAck("Messages array is missing")
+                        return@on
+                    }
+
+                    val messages: List<PushMessage> =
                         Gson().fromJson(messagesJsonArray.toString(), Array<PushMessage>::class.java).toList()
-                    } else {
-                        emptyList()
+
+                    if (messages.isEmpty()) {
+                        payload.sendErrorAck("No messages received")
+                        return@on
                     }
 
                     eventListener.onReceivePushMessages(webSocketId, messages)
+
+                    payload.sendOkAck()
                 } catch (e: Exception) {
                     Log.e("SocketSignaling", "Error parsing push messages: ${e.message}", e)
+                    payload.sendErrorAck("Error parsing push messages: ${e.message}")
                 }
             }
             on(Event.MOBILE_RECEIVE_REQUEST_REMOTE_CONTROL) { args ->
@@ -113,14 +125,6 @@ class SocketSignaling(
             }
             open()
         }
-    }
-
-    fun sendPushMessages(webSocketId: String, messages: List<PushMessage>) {
-        val gson = Gson()
-        val jsonObject = JSONObject()
-        jsonObject.put(Payload.WEB_SOCKET_ID, webSocketId)
-        jsonObject.put(Payload.MESSAGES, gson.toJson(messages))
-        socket?.emit(Event.MOBILE_SEND_PUSH_MESSAGES, jsonObject)
     }
 
     fun sendAcceptRemoteControl(webSocketId: String, deviceId: String, errorMessage: String? = null) {

@@ -20,88 +20,101 @@ import java.io.File
 object PushNotificationProcessor {
     fun process(message: PushMessage, context: Context) {
         log("Got Push Message, type " + message.messageType)
-        if (message.messageType == PushMessage.TYPE_CONFIG_UPDATED) {
-            // Update local configuration
-            ConfigUpdater.notifyConfigUpdate(context)
-            // The configUpdated should be broadcasted after the configuration update is completed
-            return
-        } else if (message.messageType == PushMessage.TYPE_RUN_APP) {
-            // Run application
-            runApplication(context, message.payload?.let { JSONObject(it) })
-            // Do not broadcast this message to other apps
-            return
-        } else if (message.messageType == PushMessage.TYPE_UNINSTALL_APP) {
-            // Uninstall application
-            AsyncTask.execute {
-                uninstallApplication(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+        when (message.messageType) {
+            PushMessage.TYPE_CONFIG_UPDATED -> {
+                // Update local configuration
+                ConfigUpdater.notifyConfigUpdate(context)
+                // The configUpdated should be broadcasted after the configuration update is completed
+                return
             }
-            return
-        } else if (message.messageType == PushMessage.TYPE_DELETE_FILE) {
-            // Delete file
-            AsyncTask.execute {
-                deleteFile(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+            PushMessage.TYPE_RUN_APP -> {
+                // Run application
+                runApplication(context, message.payload?.let { JSONObject(it) })
+                // Do not broadcast this message to other apps
+                return
             }
-            return
-        } else if (message.messageType == PushMessage.TYPE_DELETE_DIR) {
-            // Delete directory recursively
-            AsyncTask.execute {
-                deleteDir(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+            PushMessage.TYPE_UNINSTALL_APP -> {
+                // Uninstall application
+                AsyncTask.execute {
+                    uninstallApplication(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
             }
-            return
-        } else if (message.messageType == PushMessage.TYPE_PURGE_DIR) {
-            // Purge directory (delete all files recursively)
-            AsyncTask.execute {
-                purgeDir(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+            PushMessage.TYPE_DELETE_FILE -> {
+                // Delete file
+                AsyncTask.execute {
+                    deleteFile(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
             }
-            return
-        } else if (message.messageType == PushMessage.TYPE_PERMISSIVE_MODE) {
-            // Turn on permissive mode
-            LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(Const.ACTION_PERMISSIVE_MODE))
-            return
-        } else if (message.messageType == PushMessage.TYPE_RUN_COMMAND) {
-            // Run a command-line script
-            AsyncTask.execute {
-                runCommand(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+            PushMessage.TYPE_DELETE_DIR -> {
+                // Delete directory recursively
+                AsyncTask.execute {
+                    deleteDir(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
             }
-            return
-        } else if (message.messageType == PushMessage.TYPE_REBOOT) {
-            // Reboot a device
-            AsyncTask.execute { reboot(context) }
-            return
-        } else if (message.messageType == PushMessage.TYPE_EXIT_KIOSK) {
-            // Temporarily exit kiosk mode
-            LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(Const.ACTION_EXIT_KIOSK))
-            return
-        } else if (message.messageType == PushMessage.TYPE_CLEAR_DOWNLOADS) {
-            // Clear download history
-            AsyncTask.execute { clearDownloads(context) }
-            return
-        } else if (message.messageType == PushMessage.TYPE_SETTINGS) {
-            // Clear download history
-            AsyncTask.execute {
-                openSettings(
-                    context,
-                    message.payload?.let { JSONObject(it) }
-                )
+            PushMessage.TYPE_PURGE_DIR -> {
+                // Purge directory (delete all files recursively)
+                AsyncTask.execute {
+                    purgeDir(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
             }
-            return
+            PushMessage.TYPE_PERMISSIVE_MODE -> {
+                // Turn on permissive mode
+                LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(Const.ACTION_PERMISSIVE_MODE))
+                return
+            }
+            PushMessage.TYPE_RUN_COMMAND -> {
+                // Run a command-line script
+                AsyncTask.execute {
+                    runCommand(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
+            }
+            PushMessage.TYPE_REBOOT -> {
+                // Reboot a device
+                AsyncTask.execute { reboot(context) }
+                return
+            }
+            PushMessage.TYPE_EXIT_KIOSK -> {
+                // Temporarily exit kiosk mode
+                LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(Const.ACTION_EXIT_KIOSK))
+                return
+            }
+            PushMessage.TYPE_CLEAR_DOWNLOADS -> {
+                // Clear download history
+                AsyncTask.execute { clearDownloads(context) }
+                return
+            }
+            PushMessage.TYPE_SETTINGS -> {
+                // Clear download history
+                AsyncTask.execute {
+                    openSettings(
+                        context,
+                        message.payload?.let { JSONObject(it) }
+                    )
+                }
+                return
+            }
+            else -> log("Unknown Push Message type: " + message.messageType)
         }
-        log("Unknown Push Message type: " + message.messageType)
     }
 
     private fun runApplication(context: Context, payload: JSONObject?) {

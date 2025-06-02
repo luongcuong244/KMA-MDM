@@ -72,7 +72,6 @@ class SocketService : Service() {
                 for (message in messages) {
                     PushNotificationProcessor.process(message, this@SocketService)
                 }
-                SocketManager.get().sendPushMessages(webSocketId, messages)
             }
 
             override fun onReceiveRequestRemoteControl(webSocketId: String) {
