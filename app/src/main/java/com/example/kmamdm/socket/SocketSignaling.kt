@@ -22,7 +22,7 @@ class SocketSignaling(
         fun onSocketDisconnected(reason: String)
         fun onError(error: String)
         fun onReceiveViewDeviceStatus(): DeviceStatus
-        fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>)
+        fun onReceivePushMessages(messages: List<PushMessage>)
         fun onReceiveRequestRemoteControl(onError: (String) -> Unit, onSuccess: () -> Unit)
     }
 
@@ -89,13 +89,7 @@ class SocketSignaling(
             on(Event.MOBILE_RECEIVE_PUSH_MESSAGES) { args ->
                 val payload = SocketPayload.fromPayload(args)
                 try {
-                    val webSocketId = payload.json?.optString(Payload.WEB_SOCKET_ID, "")
                     val messagesJsonArray = payload.json?.optJSONArray(Payload.MESSAGES)
-
-                    if (webSocketId.isNullOrEmpty()) {
-                        payload.sendErrorAck("WebSocket ID is missing")
-                        return@on
-                    }
 
                     if (messagesJsonArray == null) {
                         payload.sendErrorAck("Messages array is missing")
@@ -110,7 +104,7 @@ class SocketSignaling(
                         return@on
                     }
 
-                    eventListener.onReceivePushMessages(webSocketId, messages)
+                    eventListener.onReceivePushMessages(messages)
 
                     payload.sendOkAck()
                 } catch (e: Exception) {

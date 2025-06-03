@@ -68,7 +68,7 @@ class SocketService : Service() {
                 return deviceStatus
             }
 
-            override fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>) {
+            override fun onReceivePushMessages(messages: List<PushMessage>) {
                 for (message in messages) {
                     PushNotificationProcessor.process(message, this@SocketService)
                 }
