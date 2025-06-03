@@ -23,14 +23,13 @@ class SocketSignaling(
         fun onError(error: String)
         fun onReceiveViewDeviceStatus(): DeviceStatus
         fun onReceivePushMessages(webSocketId: String, messages: List<PushMessage>)
-        fun onReceiveRequestRemoteControl(webSocketId: String)
+        fun onReceiveRequestRemoteControl(onError: (String) -> Unit, onSuccess: () -> Unit)
     }
 
     private object Event {
         const val SOCKET_ERROR = "SOCKET:ERROR"
         const val MOBILE_RECEIVE_VIEW_DEVICE_STATUS = "mobile:receive:view_device_status"
         const val MOBILE_RECEIVE_PUSH_MESSAGES = "mobile:receive:push_messages"
-        const val MOBILE_SEND_PUSH_MESSAGES = "mobile:send:push_messages"
         const val MOBILE_RECEIVE_REQUEST_REMOTE_CONTROL = "mobile:receive:request_remote_control"
         const val MOBILE_SEND_ACCEPT_REMOTE_CONTROL = "mobile:send:accept_remote_control"
     }
@@ -120,8 +119,17 @@ class SocketSignaling(
                 }
             }
             on(Event.MOBILE_RECEIVE_REQUEST_REMOTE_CONTROL) { args ->
-                val webSocketId = (args?.firstOrNull() as? JSONObject)?.optString(Payload.WEB_SOCKET_ID) ?: ""
-                eventListener.onReceiveRequestRemoteControl(webSocketId)
+                val payload = SocketPayload.fromPayload(args)
+                eventListener.onReceiveRequestRemoteControl(
+                    onError = {
+                        payload.sendErrorAck(it)
+                    },
+                    onSuccess = {
+                        payload.sendOkAck(JSONObject().apply {
+                            put(Payload.STATUS, Payload.SUCCESS)
+                        })
+                    }
+                )
             }
             open()
         }

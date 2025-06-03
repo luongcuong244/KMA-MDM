@@ -74,20 +74,20 @@ class SocketService : Service() {
                 }
             }
 
-            override fun onReceiveRequestRemoteControl(webSocketId: String) {
+            override fun onReceiveRequestRemoteControl(onError: (String) -> Unit, onSuccess: () -> Unit) {
                 // show dialog thông báo cho người dùng rằng admin muốn điều khiển thiết bị này
-                showOverlayRemoteDialog(webSocketId)
+                showOverlayRemoteDialog(onError, onSuccess)
             }
         })
         return START_STICKY
     }
 
-    private fun showOverlayRemoteDialog(webSocketId: String) {
+    private fun showOverlayRemoteDialog(onError: (String) -> Unit, onSuccess: () -> Unit) {
         Handler(Looper.getMainLooper()).post {
             if (overlayView != null) return@post
 
             if (!Settings.canDrawOverlays(this)) {
-                SocketManager.get().sendAcceptRemoteControl(webSocketId, "", "Ứng dụng MDM không thể hiển thị dialog confirm vì không có quyền overlay")
+                onError.invoke("Ứng dụng MDM không thể hiển thị dialog confirm vì không có quyền overlay")
                 return@post
             }
 
@@ -127,17 +127,18 @@ class SocketService : Service() {
                 var errorMessage: String? = null
                 val deviceId = SettingsHelper.getInstance(this).getDeviceId() ?: ""
                 if (deviceId.isEmpty()) {
-                    errorMessage = "Device ID chưa được thiết lập trên điện thoại."
+                    onError.invoke("Device ID chưa được thiết lập trên điện thoại.")
+                    return@setOnClickListener
                 }
                 val launchIntent = packageManager.getLaunchIntentForPackage(Const.APUPPET_PACKAGE_NAME)
                 if (launchIntent != null) {
                     launchIntent.putExtra("deviceId", deviceId)
                     startActivity(launchIntent)
                 } else {
-                    errorMessage = "Ứng dụng Remote không được cài đặt trên thiết bị này."
+                    onError.invoke("Ứng dụng Remote không được cài đặt trên thiết bị này.")
+                    return@setOnClickListener
                 }
-
-                SocketManager.get().sendAcceptRemoteControl(webSocketId, deviceId, errorMessage)
+                onSuccess.invoke()
             }
         }
     }
