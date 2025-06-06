@@ -597,7 +597,7 @@ class MainActivity : BaseActivity<MainViewModel, ActivityMainBinding>(), View.On
     }
 
     private fun createLauncherButtons() {
-        createExitButton()
+        // createExitButton()
         createInfoButton()
         createUpdateButton()
     }
